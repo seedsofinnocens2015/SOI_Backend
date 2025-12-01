@@ -55,13 +55,18 @@ const ensureTransporter = () => {
   return transporter;
 };
 
+const sanitizePhone = (phone) => {
+  if (!phone) return '';
+  return String(phone).replace(/\D/g, '').slice(-10);
+};
+
 const buildInternationalLeadSquaredPayload = (formData = {}) => {
   const {
     husbandName = '',
     wifeName = '',
     email = '',
+    phone = '',
     typeOfService = '',
-    preferredDate = '',
     centerLocation = '',
   } = formData;
 
@@ -77,6 +82,13 @@ const buildInternationalLeadSquaredPayload = (formData = {}) => {
     throw error;
   }
 
+  const safePhone = sanitizePhone(phone);
+  if (!safePhone) {
+    const error = new Error('Phone is required');
+    error.status = 400;
+    throw error;
+  }
+
   const fullName = [husbandName, wifeName].filter(Boolean).join(' & ');
   const leadSource = 'international';
 
@@ -86,8 +98,8 @@ const buildInternationalLeadSquaredPayload = (formData = {}) => {
     husbandName,
     wifeName,
     email,
+    phone: safePhone,
     typeOfService,
-    preferredDate,
     centerLocation,
     source: leadSource,
   };
@@ -95,7 +107,7 @@ const buildInternationalLeadSquaredPayload = (formData = {}) => {
   const payload = [
     { Attribute: 'FirstName', Value: fullName || husbandName || wifeName },
     { Attribute: 'EmailAddress', Value: email },
-    { Attribute: 'mx_Appointment_Date', Value: preferredDate },
+    { Attribute: 'Phone', Value: safePhone },
     { Attribute: 'mx_Center_Location', Value: centerLocation },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notes },
@@ -209,8 +221,8 @@ const createInternationalConsultation = async (req, res) => {
       husbandName: normalized.husbandName,
       wifeName: normalized.wifeName,
       email: normalized.email,
+      phone: normalized.phone,
       typeOfService: normalized.typeOfService,
-      preferredDate: normalized.preferredDate,
       centerLocation: normalized.centerLocation,
       source: normalized.source,
     };
