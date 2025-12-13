@@ -5,6 +5,7 @@ const cors = require('cors');
 const websiteBookingRoutes = require('./routes/websiteBookingPageRoutes');
 const internationalLandingRoutes = require('./routes/internationalLandingPageRoutes');
 const nationalLandingRoutes = require('./routes/nationalLandingPageRoutes');
+const newWebsiteRoutes = require('./routes/newWebsiteRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +29,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/website-bookings', websiteBookingRoutes);
 app.use('/api/internal-consultation', internationalLandingRoutes);
 app.use('/api/landing-pages', nationalLandingRoutes);
+app.use('/api/new-website', newWebsiteRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error', err);
