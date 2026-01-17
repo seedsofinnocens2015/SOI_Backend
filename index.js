@@ -8,7 +8,7 @@ const nationalLandingRoutes = require('./routes/nationalLandingPageRoutes');
 const newWebsiteRoutes = require('./routes/newWebsiteRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
@@ -39,5 +39,4 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`Backend listening on port ${PORT}`);
 });
-
 

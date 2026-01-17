@@ -68,14 +68,28 @@ const sanitizePhone = (phone) => {
 };
 
 const buildNationalLeadSquaredPayload = (formData = {}) => {
-  const {
+  let {
     firstName = '',
     lastName = '',
+    fullName = '',
     email = '',
     phone = '',
+    phoneNumber = '',
     message = '',
     source = '',
   } = formData;
+
+  // Handle fullName if provided (for frontend compatibility)
+  if (fullName && !firstName) {
+    const nameParts = fullName.trim().split(/\s+/);
+    firstName = nameParts[0] || '';
+    lastName = nameParts.slice(1).join(' ') || '';
+  }
+
+  // Handle phoneNumber if provided (for frontend compatibility)
+  if (phoneNumber && !phone) {
+    phone = phoneNumber;
+  }
 
   if (!firstName || !firstName.trim()) {
     const error = new Error('First name is required');
@@ -91,7 +105,7 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
   }
 
   const leadSource = (source || 'landing Google Ads').trim();
-  const fullName = `${firstName} ${lastName || ''}`.trim();
+  const displayFullName = `${firstName} ${lastName || ''}`.trim();
 
   const normalized = {
     firstName,
@@ -113,6 +127,7 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
 
   return {
     leadSquaredPayload: payload,
+    
     normalized,
   };
 };
