@@ -77,7 +77,20 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
     phoneNumber = '',
     message = '',
     source = '',
+    tryingToConceive = '',
+    consultedSpecialist = '',
+    previousTreatment = '',
   } = formData;
+
+  // Append extra details to message
+  const details = [];
+  if (tryingToConceive) details.push(`Trying to conceive: ${tryingToConceive}`);
+  if (consultedSpecialist) details.push(`Consulted specialist: ${consultedSpecialist}`);
+  if (previousTreatment) details.push(`Previous treatment: ${previousTreatment}`);
+  
+  if (details.length > 0) {
+    message = message ? `${message}\n${details.join('\n')}` : details.join('\n');
+  }
 
   // Handle fullName if provided (for frontend compatibility)
   if (fullName && !firstName) {
