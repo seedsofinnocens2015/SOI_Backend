@@ -27,6 +27,7 @@ const NOTIFICATION_EMAIL = cleanEnvValue(
 );
 const EMAIL_FROM =
   cleanEnvValue(process.env.EMAIL_FROM || SMTP_FROM) || `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
+const DUPLICATE_MESSAGE = 'Already filled your application';
 
 let transporter;
 
@@ -76,7 +77,7 @@ const buildLeadSquaredPayload = (formData) => {
     message = '',
   } = formData;
 
-  const leadSource = 'website form';
+  const leadSource = 'New Website Form';
 
   const safePhone = sanitizePhone(phone);
   if (!name || !safePhone) {
@@ -170,7 +171,16 @@ const postToLeadSquared = async (payload) => {
 
 const sendNotificationEmail = async (formData, options = {}) => {
   const mailer = ensureTransporter();
-  if (!mailer || !NOTIFICATION_EMAIL) return;
+  if (!mailer) {
+    const error = new Error('SMTP is not configured. Notification email cannot be sent.');
+    error.status = 500;
+    throw error;
+  }
+  if (!NOTIFICATION_EMAIL) {
+    const error = new Error('Notification email recipient is not configured.');
+    error.status = 500;
+    throw error;
+  }
   const { leadSquaredStatus } = options;
 
   const emailData = {
@@ -206,17 +216,13 @@ const sendNotificationEmail = async (formData, options = {}) => {
     </div>
   `;
 
-  try {
-    const subjectName = emailData.name || 'Lead';
-    await mailer.sendMail({
-      from: EMAIL_FROM,
-      to: NOTIFICATION_EMAIL,
-      subject: `New Appointment Booking - ${subjectName}`,
-      html,
-    });
-  } catch (err) {
-    console.error('Failed to send notification email', err);
-  }
+  const subjectName = emailData.name || 'Lead';
+  await mailer.sendMail({
+    from: EMAIL_FROM,
+    to: NOTIFICATION_EMAIL,
+    subject: `New Appointment Booking - ${subjectName}`,
+    html,
+  });
 };
 
 const describeLeadSquaredError = (error) => {
@@ -237,13 +243,30 @@ const describeLeadSquaredError = (error) => {
   return [statusPart, messagePart].filter(Boolean).join(' - ') || 'Unknown LeadSquared error';
 };
 
+const isDuplicateLeadSquaredResponse = (response) => {
+  if (!response) return false;
+  const errorCode = `${response.errorCode || response.ErrorCode || ''}`.toUpperCase();
+  const status = `${response.status || response.Status || ''}`.toLowerCase();
+  const message = `${response.message || response.Message || ''}`.toLowerCase();
+  const duplicateFlag = response.duplicate === true;
+  return duplicateFlag || errorCode.includes('DUPLICATE') || status.includes('duplicate') || message.includes('duplicate');
+};
+
+const isDuplicateLeadSquaredError = (error) => {
+  const status = error?.response?.status;
+  const data = error?.response?.data;
+  const stringified = typeof data === 'string' ? data : JSON.stringify(data || {});
+  const message = `${error?.message || ''} ${stringified}`.toLowerCase();
+  return status === 409 || message.includes('duplicate');
+};
+
 const createBookAppointment = async (req, res) => {
   try {
     const submittedAt = new Date();
 
     const { leadSquaredPayload, normalized } = buildLeadSquaredPayload({
       ...req.body,
-      source: 'website form',
+      source: 'New Website Form',
     });
 
     const emailPayload = {
@@ -271,12 +294,36 @@ const createBookAppointment = async (req, res) => {
       console.error('Message:', err.message);
     }
 
-    const leadSquaredStatusNote = leadSquaredError ? `FAILED – ${describeLeadSquaredError(leadSquaredError)}` : 'Success';
+    if (leadSquaredError && isDuplicateLeadSquaredError(leadSquaredError)) {
+      return res.status(409).json({
+        ok: false,
+        duplicate: true,
+        error: DUPLICATE_MESSAGE,
+      });
+    }
 
-    await sendNotificationEmail(emailPayload, { leadSquaredStatus: leadSquaredStatusNote });
+    if (!leadSquaredError && isDuplicateLeadSquaredResponse(leadSquaredResponse)) {
+      return res.status(409).json({
+        ok: false,
+        duplicate: true,
+        error: DUPLICATE_MESSAGE,
+      });
+    }
+
+    const leadSquaredStatusNote = leadSquaredError ? `FAILED – ${describeLeadSquaredError(leadSquaredError)}` : 'Success';
+    let emailError = null;
+    try {
+      await sendNotificationEmail(emailPayload, { leadSquaredStatus: leadSquaredStatusNote });
+    } catch (err) {
+      emailError = err;
+      console.error('❌ Notification email sending failed');
+      console.error('Message:', err.message);
+    }
 
     if (leadSquaredError) {
-      throw leadSquaredError;
+      const combinedError = new Error(`LeadSquared: ${describeLeadSquaredError(leadSquaredError)}`);
+      combinedError.status = leadSquaredError?.response?.status || 500;
+      throw combinedError;
     }
 
     const duplicate = Boolean(
@@ -289,6 +336,8 @@ const createBookAppointment = async (req, res) => {
       ok: true,
       duplicate,
       leadSquaredResponse,
+      emailSent: !emailError,
+      ...(emailError ? { warning: `Email notification failed: ${emailError.message}` } : {}),
       submittedAt: submittedAt.toISOString(),
     });
   } catch (error) {
