@@ -51,6 +51,8 @@ const getFormValue = (body, key) => {
   return typeof value === 'string' ? value.trim() : value;
 };
 
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 const sendFeedbackNotificationEmail = async (payload) => {
   const mailer = ensureTransporter();
 
@@ -106,10 +108,16 @@ const createUnifiedFormSubmission = async (req, res) => {
       submittedAt: new Date().toISOString(),
     };
 
-    if (!payload.name || !payload.email || !payload.feedbackType || !payload.rating || !payload.feedback) {
+    if (!payload.name || !payload.feedbackType || !payload.rating || !payload.feedback) {
       return res.status(400).json({
         ok: false,
         error: 'Missing required feedback fields.',
+      });
+    }
+    if (payload.email && !isValidEmail(payload.email)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid email address.',
       });
     }
 
