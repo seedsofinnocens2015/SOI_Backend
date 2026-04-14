@@ -71,8 +71,6 @@ const buildLeadSquaredPayload = (formData) => {
     name = '',
     phone,
     email = '',
-    date = '',
-    time = '',
     center = '',
     message = '',
   } = formData;
@@ -90,8 +88,6 @@ const buildLeadSquaredPayload = (formData) => {
 
   // Build appointment details for notes
   const appointmentDetails = [
-    `Preferred Date: ${date || 'NA'}`,
-    `Preferred Time: ${time || 'NA'}`,
     `Center: ${center || 'NA'}`,
   ].filter(item => !item.includes('NA')).join(' | ');
 
@@ -101,8 +97,6 @@ const buildLeadSquaredPayload = (formData) => {
 
   // Full message for email (includes all details)
   const fullMessage = [
-    `Preferred Date: ${date || 'NA'}`,
-    `Preferred Time: ${time || 'NA'}`,
     `Center: ${center || 'NA'}`,
     message ? `Message: ${message}` : '',
   ].filter(Boolean).join(' | ');
@@ -112,8 +106,6 @@ const buildLeadSquaredPayload = (formData) => {
     lastName,
     phone: safePhone,
     email,
-    date,
-    time,
     center,
     message: fullMessage,
     source: leadSource,
@@ -124,8 +116,6 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'LastName', Value: lastName },
     { Attribute: 'Phone', Value: safePhone },
     { Attribute: 'EmailAddress', Value: email },
-    { Attribute: 'mx_Appointment_Date', Value: date },
-    { Attribute: 'mx_Appointment_Time', Value: time },
     { Attribute: 'mx_Center_Name', Value: center },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
@@ -187,8 +177,6 @@ const sendNotificationEmail = async (formData, options = {}) => {
     name: formData.name || `${formData.firstName} ${formData.lastName || ''}`.trim(),
     phone: formData.phone,
     email: formData.email,
-    date: formData.date,
-    time: formData.time,
     center: formData.center,
     message: formData.message,
   };
@@ -275,8 +263,6 @@ const createBookAppointment = async (req, res) => {
       lastName: normalized.lastName,
       phone: normalized.phone,
       email: normalized.email,
-      date: normalized.date,
-      time: normalized.time,
       center: normalized.center,
       message: normalized.message,
       source: normalized.source,

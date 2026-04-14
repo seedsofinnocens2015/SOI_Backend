@@ -64,78 +64,55 @@ const ensureTransporter = () => {
 
 const sanitizePhone = (phone) => {
   if (!phone) return '';
-  return String(phone).replace(/\D/g, '').slice(-10);
+  return String(phone).replace(/\D/g, '');
 };
 
 const buildNationalLeadSquaredPayload = (formData = {}) => {
-  let {
-    firstName = '',
-    lastName = '',
+  const {
     fullName = '',
-    email = '',
-    phone = '',
     phoneNumber = '',
-    message = '',
-    source = '',
-    tryingToConceive = '',
-    consultedSpecialist = '',
-    previousTreatment = '',
+    center = '',
   } = formData;
 
-  // Append extra details to message
-  const details = [];
-  if (tryingToConceive) details.push(`Trying to conceive: ${tryingToConceive}`);
-  if (consultedSpecialist) details.push(`Consulted specialist: ${consultedSpecialist}`);
-  if (previousTreatment) details.push(`Previous treatment: ${previousTreatment}`);
-  
-  if (details.length > 0) {
-    message = message ? `${message}\n${details.join('\n')}` : details.join('\n');
-  }
-
-  // Handle fullName if provided (for frontend compatibility)
-  if (fullName && !firstName) {
-    const nameParts = fullName.trim().split(/\s+/);
-    firstName = nameParts[0] || '';
-    lastName = nameParts.slice(1).join(' ') || '';
-  }
-
-  // Handle phoneNumber if provided (for frontend compatibility)
-  if (phoneNumber && !phone) {
-    phone = phoneNumber;
-  }
-
-  if (!firstName || !firstName.trim()) {
-    const error = new Error('First name is required');
+  const safeFullName = String(fullName).trim();
+  if (!safeFullName) {
+    const error = new Error('Full name is required');
     error.status = 400;
     throw error;
   }
 
-  const safePhone = sanitizePhone(phone);
+  const safePhone = sanitizePhone(phoneNumber);
   if (!safePhone) {
-    const error = new Error('Phone is required');
+    const error = new Error('Phone number is required');
     error.status = 400;
     throw error;
   }
 
-  const leadSource = (source || 'landing Google Ads').trim();
-  const displayFullName = `${firstName} ${lastName || ''}`.trim();
+  if (!/^\d{10}$/.test(safePhone)) {
+    const error = new Error('Phone must be exactly 10 digits');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!String(center).trim()) {
+    const error = new Error('Center is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const safeCenter = String(center).trim();
+  const notes = `Preferred center: ${safeCenter}`;
 
   const normalized = {
-    firstName,
-    lastName,
-    email,
-    phone: safePhone,
-    message,
-    source: leadSource,
+    fullName: safeFullName,
+    phoneNumber: safePhone,
+    center: safeCenter,
   };
 
   const payload = [
-    { Attribute: 'FirstName', Value: firstName },
-    { Attribute: 'LastName', Value: lastName },
-    { Attribute: 'EmailAddress', Value: email },
+    { Attribute: 'FirstName', Value: safeFullName },
     { Attribute: 'Phone', Value: safePhone },
-    { Attribute: 'Source', Value: leadSource },
-    { Attribute: 'Notes', Value: message || 'Free Fertility Consultation Request' },
+    { Attribute: 'Notes', Value: notes },
   ].filter((entry) => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');
 
   return {
@@ -207,7 +184,7 @@ const sendNotificationEmail = async (formData, options = {}) => {
   `;
 
   try {
-    const subjectName = normalizedData.firstName || normalizedData.email || 'Lead';
+    const subjectName = normalizedData.fullName || 'Lead';
     await mailer.sendMail({
       from: EMAIL_FROM,
       to: NOTIFICATION_EMAIL,
@@ -248,12 +225,9 @@ const createNationalLandingPageLead = async (req, res) => {
     const { leadSquaredPayload, normalized } = buildNationalLeadSquaredPayload(req.body || {});
 
     const emailPayload = {
-      firstName: normalized.firstName,
-      lastName: normalized.lastName,
-      email: normalized.email,
-      phone: normalized.phone,
-      message: normalized.message,
-      source: normalized.source,
+      fullName: normalized.fullName,
+      phoneNumber: normalized.phoneNumber,
+      center: normalized.center,
     };
 
     let leadSquaredResponse;

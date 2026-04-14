@@ -77,16 +77,17 @@ const buildLeadSquaredPayload = (formData) => {
     message = '',
   } = formData;
 
-  const leadSource = 'website enquiry';
+  const leadSource = 'New Website Form';
 
+  const safeName = String(name).trim();
   const safePhone = sanitizePhone(phone);
-  if (!name || !safePhone) {
+  if (!safeName || !safePhone) {
     const error = new Error('Missing required fields: name and phone');
     error.status = 400;
     throw error;
   }
 
-  const { firstName, lastName } = splitName(name);
+  const { firstName, lastName } = splitName(safeName);
 
   // Build call back details for notes
   const callBackDetails = [
@@ -105,7 +106,7 @@ const buildLeadSquaredPayload = (formData) => {
     `Preferred Date: ${date || 'NA'}`,
     `Reason for Call: ${reason || 'NA'}`,
     message ? `Message: ${message}` : '',
-  ].filter(Boolean).join(' | ');
+  ].filter(item => !item.includes('NA') && item.trim() !== '').join(' | ');
 
   const normalized = {
     firstName,
@@ -265,7 +266,7 @@ const createCallBackRequest = async (req, res) => {
 
     const { leadSquaredPayload, normalized } = buildLeadSquaredPayload({
       ...req.body,
-      source: 'website form',
+      source: 'New Website Form',
     });
 
     const emailPayload = {
