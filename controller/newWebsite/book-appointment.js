@@ -75,7 +75,7 @@ const buildLeadSquaredPayload = (formData) => {
     message = '',
   } = formData;
 
-  const leadSource = 'New Website Form';
+  const leadSource = 'Website Form';
 
   const safePhone = sanitizePhone(phone);
   if (!name || !safePhone) {
