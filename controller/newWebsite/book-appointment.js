@@ -245,7 +245,12 @@ const isDuplicateLeadSquaredError = (error) => {
   const data = error?.response?.data;
   const stringified = typeof data === 'string' ? data : JSON.stringify(data || {});
   const message = `${error?.message || ''} ${stringified}`.toLowerCase();
-  return status === 409 || message.includes('duplicate');
+  return (
+    status === 409 ||
+    message.includes('duplicate') ||
+    message.includes('mxduplicateentryexception') ||
+    message.includes('same phone number already exists')
+  );
 };
 
 const createBookAppointment = async (req, res) => {
