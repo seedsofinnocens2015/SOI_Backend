@@ -254,7 +254,7 @@ const createBookAppointment = async (req, res) => {
 
     const { leadSquaredPayload, normalized } = buildLeadSquaredPayload({
       ...req.body,
-      source: 'New Website Form',
+      source: 'Website Form',
     });
 
     const emailPayload = {
