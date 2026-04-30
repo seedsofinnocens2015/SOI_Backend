@@ -1,10 +1,12 @@
 const express = require('express');
-const { saveSeo, getSeo } = require('../controller/seoController');
+const { saveSeo, getSeo, getSeoStats } = require('../controller/seoController');
+const { protectSeoAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/', saveSeo);
-router.put('/', saveSeo);
 router.get('/', getSeo);
+router.get('/stats', protectSeoAuth, getSeoStats);
+router.post('/', protectSeoAuth, saveSeo);
+router.put('/', protectSeoAuth, saveSeo);
 
 module.exports = router;

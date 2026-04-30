@@ -8,6 +8,7 @@ const internationalLandingRoutes = require('./routes/internationalLandingPageRou
 const nationalLandingRoutes = require('./routes/nationalLandingPageRoutes');
 const newWebsiteRoutes = require('./routes/newWebsiteRoutes');
 const seoRoutes = require('./seo-panel/routes/seoRoutes');
+const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT;
@@ -57,6 +58,7 @@ app.use('/api/website-bookings', websiteBookingRoutes);
 app.use('/api/internal-consultation', internationalLandingRoutes);
 app.use('/api/landing-pages', nationalLandingRoutes);
 app.use('/api/new-website', newWebsiteRoutes);
+app.use('/api/seo-auth', seoAuthRoutes);
 app.use('/api/seo', seoRoutes);
 
 app.use((err, _req, res, _next) => {

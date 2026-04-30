@@ -46,10 +46,47 @@ const seoSchema = new Schema(
     itemImage: { type: String, trim: true, default: '' },
     itemAuthor: { type: String, trim: true, default: '' },
     itemOrganization: { type: String, trim: true, default: '' },
+    hierarchyPath: { type: [String], default: [] },
   },
   { timestamps: true }
 );
 
 seoSchema.index({ pageUrl: 1 }, { unique: true });
 
-module.exports = mongoose.model('Seo', seoSchema);
+function sanitizeCollectionSegment(segment = '') {
+  return String(segment)
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
+
+function buildCollectionName(hierarchyPath = []) {
+  const segments = Array.isArray(hierarchyPath)
+    ? hierarchyPath.map(sanitizeCollectionSegment).filter(Boolean)
+    : [];
+
+  if (!segments.length) {
+    return 'seo_default';
+  }
+
+  return `seo_${segments.join('__')}`;
+}
+
+function getSeoModel(hierarchyPath = []) {
+  const collectionName = buildCollectionName(hierarchyPath);
+  const modelName = `Seo_${collectionName}`;
+
+  if (mongoose.models[modelName]) {
+    return mongoose.models[modelName];
+  }
+
+  return mongoose.model(modelName, seoSchema, collectionName);
+}
+
+module.exports = {
+  getSeoModel,
+  buildCollectionName,
+};
