@@ -1,6 +1,6 @@
 const runtimeConfig = {
   PORT: '4000',
-  MONGO_URI: 'mongodb://localhost:27017/seo_panel',
+  MONGO_URI: 'mongodb://seo_panel:9315264682@ac-fv7uqzx-shard-00-00.wbfh1zj.mongodb.net:27017,ac-fv7uqzx-shard-00-01.wbfh1zj.mongodb.net:27017,ac-fv7uqzx-shard-00-02.wbfh1zj.mongodb.net:27017/?ssl=true&replicaSet=atlas-xlg8mn-shard-0&authSource=admin&appName=Cluster0',
   ALLOWED_ORIGINS:
     'http://localhost:3000,https://www.seedsofinnocens.com,https://www.seedsofinnocence.com,https://soi.seedsofinnocens.com',
   RECEIVER_EMAIL: 'digital@seedsofinnocence.com',
