@@ -14,6 +14,7 @@ const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || runtimeConfig.PORT;
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || runtimeConfig.MONGO_URI;
+let mongoConnectionPromise = null;
 
 mongoose.set('strictQuery', true);
 mongoose.connection.on('error', err => console.error('Mongo Error:', err));
@@ -51,6 +52,43 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
+const connectToDatabase = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (mongoConnectionPromise) {
+    return mongoConnectionPromise;
+  }
+
+  if (!MONGO_URI) {
+    throw new Error('Missing MONGO_URI in environment variables');
+  }
+
+  mongoConnectionPromise = mongoose
+    .connect(MONGO_URI, { family: 4 })
+    .then(() => {
+      console.log('MongoDB Connected Successfully');
+      return mongoose.connection;
+    })
+    .catch((err) => {
+      mongoConnectionPromise = null;
+      throw err;
+    });
+
+  return mongoConnectionPromise;
+};
+
+app.use(async (_req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (err) {
+    console.error('MongoDB Connection Failed:', err.message);
+    res.status(500).json({ ok: false, error: 'Database connection failed' });
+  }
+});
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
 });
@@ -69,17 +107,7 @@ app.use((err, _req, res, _next) => {
 
 const startServer = async () => {
   try {
-    if (!MONGO_URI) {
-      console.error('[MongoDB] Missing MONGO_URI in environment variables');
-      process.exit(1);
-    }
-
-    // console.log('[MongoDB] Starting connection...');
-    // console.log('Connecting to MongoDB with URI:', MONGO_URI);
-    await mongoose.connect(MONGO_URI, {
-      family: 4,
-    });
-    console.log('MongoDB Connected Successfully');
+    await connectToDatabase();
 
     app.listen(PORT, () => {
       console.log(`Backend listening on port ${PORT}`);
@@ -90,4 +118,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+module.exports = app;
