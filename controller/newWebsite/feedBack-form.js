@@ -1,17 +1,19 @@
 const nodemailer = require('nodemailer');
+const runtimeConfig = require('../../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 
-const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST);
-const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT);
-const SMTP_USER = cleanEnvValue(process.env.SMTP_USER);
-const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS);
-const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE);
-const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM);
+const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
+const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT || runtimeConfig.SMTP_PORT);
+const SMTP_USER = cleanEnvValue(process.env.SMTP_USER || runtimeConfig.SMTP_USER);
+const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS || runtimeConfig.SMTP_PASS);
+const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE || runtimeConfig.SMTP_SECURE);
+const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM || runtimeConfig.SMTP_FROM);
 const EMAIL_FROM =
-  cleanEnvValue(process.env.EMAIL_FROM || SMTP_FROM) || `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
+  cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
+  `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
 const FEEDBACK_NOTIFICATION_EMAIL = cleanEnvValue(
-  process.env.FEEDBACK_RECEIVER_EMAIL || 'feedback@seedsofinnocence.com'
+  process.env.FEEDBACK_RECEIVER_EMAIL || runtimeConfig.FEEDBACK_RECEIVER_EMAIL
 );
 
 let transporter;

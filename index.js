@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const runtimeConfig = require('./config/runtimeConfig');
 
 const websiteBookingRoutes = require('./routes/websiteBookingPageRoutes');
 const internationalLandingRoutes = require('./routes/internationalLandingPageRoutes');
@@ -11,14 +12,14 @@ const seoRoutes = require('./seo-panel/routes/seoRoutes');
 const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
 
 const app = express();
-const PORT = process.env.PORT;
-const MONGO_URI = process.env.MONGO_URI 
+const PORT = process.env.PORT || runtimeConfig.PORT;
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || runtimeConfig.MONGO_URI;
 
 mongoose.set('strictQuery', true);
 mongoose.connection.on('error', err => console.error('Mongo Error:', err));
 mongoose.connection.on('disconnected', () => console.warn('MongoDB Disconnected'));
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || runtimeConfig.ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);

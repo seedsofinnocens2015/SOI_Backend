@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const runtimeConfig = require('../../config/runtimeConfig');
 
 const SeoUser = require('../model/SeoUser');
 const SeoAuthOtp = require('../model/SeoAuthOtp');
@@ -10,19 +11,20 @@ const OTP_TTL_SECONDS = 60;
 const OTP_ATTEMPTS = 5;
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
-const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST);
-const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT);
-const SMTP_USER = cleanEnvValue(process.env.SMTP_USER);
-const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS);
-const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE);
-const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM);
+const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
+const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT || runtimeConfig.SMTP_PORT);
+const SMTP_USER = cleanEnvValue(process.env.SMTP_USER || runtimeConfig.SMTP_USER);
+const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS || runtimeConfig.SMTP_PASS);
+const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE || runtimeConfig.SMTP_SECURE);
+const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM || runtimeConfig.SMTP_FROM);
 const EMAIL_FROM =
-  cleanEnvValue(process.env.EMAIL_FROM || SMTP_FROM) || `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
+  cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
+  `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
 
 let transporter;
 
 function getJwtSecret() {
-  return process.env.SEO_AUTH_JWT_SECRET || process.env.JWT_SECRET || 'change-this-seo-secret';
+  return process.env.SEO_AUTH_JWT_SECRET || process.env.JWT_SECRET || runtimeConfig.SEO_AUTH_JWT_SECRET;
 }
 
 function normalizeEmail(email = '') {

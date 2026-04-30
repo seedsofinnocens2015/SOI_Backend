@@ -1,36 +1,38 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const runtimeConfig = require('../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 
 // SMTP / email config
-const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST);
-const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT);
-const SMTP_USER = cleanEnvValue(process.env.SMTP_USER);
-const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS);
-const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE);
-const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM);
+const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
+const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT || runtimeConfig.SMTP_PORT);
+const SMTP_USER = cleanEnvValue(process.env.SMTP_USER || runtimeConfig.SMTP_USER);
+const SMTP_PASS = cleanEnvValue(process.env.SMTP_PASS || runtimeConfig.SMTP_PASS);
+const SMTP_SECURE = cleanEnvValue(process.env.SMTP_SECURE || runtimeConfig.SMTP_SECURE);
+const SMTP_FROM = cleanEnvValue(process.env.SMTP_FROM || runtimeConfig.SMTP_FROM);
 
 // LeadSquared config
 const LEADSQUARED_BASE_URL = cleanEnvValue(
-  process.env.LSQ_BASE_URL || process.env.LEADSQUARED_BASE_URL || process.env.LEADSQUARED_DOMAIN || ''
+  process.env.LSQ_BASE_URL || process.env.LEADSQUARED_BASE_URL || process.env.LEADSQUARED_DOMAIN || '' || runtimeConfig.LSQ_BASE_URL
 );
 const LEADSQUARED_ENDPOINT = cleanEnvValue(
   process.env.LSQ_ENDPOINT || process.env.LEADSQUARED_ENDPOINT || process.env.LEADSQUARED_URL || ''
 );
 const LEADSQUARED_ACCESS_KEY = cleanEnvValue(
-  process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || process.env.ACCESS_KEY
+  process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || process.env.ACCESS_KEY || runtimeConfig.LSQ_ACCESS_KEY
 );
 const LEADSQUARED_SECRET_KEY = cleanEnvValue(
-  process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || process.env.SECRET_KEY
+  process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || process.env.SECRET_KEY || runtimeConfig.LSQ_SECRET_KEY
 );
 
 const NOTIFICATION_EMAIL = cleanEnvValue(
-  process.env.RECEIVER_EMAIL || process.env.NOTIFICATION_EMAIL || 'digital@seedsofinnocence.com'
+  process.env.RECEIVER_EMAIL || process.env.NOTIFICATION_EMAIL || runtimeConfig.RECEIVER_EMAIL
 );
 
 const EMAIL_FROM =
-  cleanEnvValue(process.env.EMAIL_FROM || SMTP_FROM) || `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
+  cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
+  `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
 
 let transporter;
 

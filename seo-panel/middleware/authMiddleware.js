@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
+const runtimeConfig = require('../../config/runtimeConfig');
 
 function getJwtSecret() {
-  return process.env.SEO_AUTH_JWT_SECRET || process.env.JWT_SECRET || 'change-this-seo-secret';
+  return process.env.SEO_AUTH_JWT_SECRET || process.env.JWT_SECRET || runtimeConfig.SEO_AUTH_JWT_SECRET;
 }
 
 function protectSeoAuth(req, res, next) {
