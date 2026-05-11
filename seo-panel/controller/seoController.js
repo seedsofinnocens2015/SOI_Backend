@@ -106,8 +106,23 @@ const isSeoPageCollection = collectionName => {
   return collectionName.startsWith('seo_') && !excludedCollections.has(collectionName);
 };
 
+const STATS_IGNORE_KEYS = new Set([
+  '_id',
+  'pageUrl',
+  'hierarchyPath',
+  'createdAt',
+  'updatedAt',
+  '__v',
+]);
+
+/** True if any editable / SEO-related field has non-whitespace content (any one line counts as updated). */
 const hasAnySeoValue = seoDocument => {
-  return SEO_FIELDS.some(field => String(seoDocument?.[field] ?? '').trim() !== '');
+  if (!seoDocument || typeof seoDocument !== 'object') return false;
+  for (const [key, val] of Object.entries(seoDocument)) {
+    if (STATS_IGNORE_KEYS.has(key)) continue;
+    if (val != null && String(val).trim() !== '') return true;
+  }
+  return false;
 };
 
 const saveSeo = async (req, res) => {
@@ -227,19 +242,18 @@ const getSeoStats = async (req, res) => {
       .map(item => item.name)
       .filter(isSeoPageCollection);
 
+    const requestedUrlSet = new Set(normalizedPageUrls);
     const updatedPageUrls = new Set();
     for (const collectionName of seoCollectionNames) {
       const rows = await db
         .collection(collectionName)
         .find({ pageUrl: { $in: pageUrlCandidates } })
-        .project({ pageUrl: 1, ...Object.fromEntries(SEO_FIELDS.map(field => [field, 1])) })
         .toArray();
 
       rows.forEach(row => {
         const normalized = normalizePageUrl(row.pageUrl);
-        if (normalized && normalizedPageUrls.includes(normalized) && hasAnySeoValue(row)) {
-          updatedPageUrls.add(normalized);
-        }
+        if (!normalized || !requestedUrlSet.has(normalized) || !hasAnySeoValue(row)) return;
+        updatedPageUrls.add(normalized);
       });
     }
 
