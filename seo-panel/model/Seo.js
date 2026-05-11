@@ -46,6 +46,7 @@ const seoSchema = new Schema(
     itemImage: { type: String, trim: true, default: '' },
     itemAuthor: { type: String, trim: true, default: '' },
     itemOrganization: { type: String, trim: true, default: '' },
+    rawHeadTags: { type: String, default: '' },
     hierarchyPath: { type: [String], default: [] },
   },
   { timestamps: true }

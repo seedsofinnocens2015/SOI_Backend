@@ -38,6 +38,7 @@ const SEO_FIELDS = [
   'itemImage',
   'itemAuthor',
   'itemOrganization',
+  'rawHeadTags',
 ];
 
 const normalizePageUrl = (value = '') => {
@@ -65,6 +66,10 @@ const getDefaultSeo = (pageUrl = '') => {
 const normalizeSeoPayload = payload => {
   const normalizedPayload = {};
   SEO_FIELDS.forEach(field => {
+    if (field === 'rawHeadTags') {
+      normalizedPayload[field] = payload[field] == null ? '' : String(payload[field]);
+      return;
+    }
     normalizedPayload[field] = payload[field] ?? '';
   });
 
@@ -167,6 +172,42 @@ const saveSeo = async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Duplicate pageUrl not allowed' });
     }
     return res.status(500).json({ ok: false, error: 'Failed to save SEO data' });
+  }
+};
+
+const getSeoResolved = async (req, res) => {
+  try {
+    const requestedPageUrl = req.query.pageUrl || '/';
+    const pageUrl = normalizePageUrl(requestedPageUrl) || '/';
+    const pageUrlCandidates = getPageUrlCandidates(pageUrl).filter(Boolean);
+    const db = mongoose.connection.db;
+    if (!db) {
+      return res.status(500).json({ ok: false, error: 'Database is not connected' });
+    }
+
+    const collectionMetadata = await db.listCollections({}, { nameOnly: true }).toArray();
+    const seoCollectionNames = collectionMetadata
+      .map(item => item.name)
+      .filter(isSeoPageCollection)
+      .sort((a, b) => a.localeCompare(b));
+
+    for (const collectionName of seoCollectionNames) {
+      const doc = await db
+        .collection(collectionName)
+        .findOne({ pageUrl: { $in: pageUrlCandidates } });
+      if (doc && hasAnySeoValue(doc)) {
+        return res.status(200).json({ ok: true, data: doc, collection: collectionName });
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      data: { ...getDefaultSeo(pageUrl), hierarchyPath: [] },
+      collection: null,
+    });
+  } catch (error) {
+    console.error('[SEO][getSeoResolved] Error resolving SEO', error);
+    return res.status(500).json({ ok: false, error: 'Failed to resolve SEO data' });
   }
 };
 
@@ -282,6 +323,7 @@ const getSeoStats = async (req, res) => {
 module.exports = {
   saveSeo,
   getSeo,
+  getSeoResolved,
   getSeoStats,
 };
 
