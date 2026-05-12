@@ -164,6 +164,27 @@ const saveSeo = async (req, res) => {
           runValidators: true,
         });
 
+    // A pageUrl should resolve to exactly one SEO doc across all hierarchy collections.
+    // Remove any stale duplicates created under a different hierarchy so the website
+    // never picks up an outdated row.
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        const collectionMetadata = await db.listCollections({}, { nameOnly: true }).toArray();
+        const otherCollections = collectionMetadata
+          .map(item => item.name)
+          .filter(name => isSeoPageCollection(name) && name !== collectionName);
+
+        await Promise.all(
+          otherCollections.map(otherName =>
+            db.collection(otherName).deleteMany({ pageUrl: { $in: pageUrlCandidates } })
+          )
+        );
+      }
+    } catch (cleanupError) {
+      console.warn('[SEO][saveSeo] Failed to clean up duplicate pageUrl entries', cleanupError);
+    }
+
     // console.log(`[SEO][saveSeo] Upsert successful for pageUrl: ${pageUrl} in collection: ${collectionName}`);
     return res.status(200).json({ ok: true, data: seo, collection: collectionName });
   } catch (error) {
@@ -188,16 +209,30 @@ const getSeoResolved = async (req, res) => {
     const collectionMetadata = await db.listCollections({}, { nameOnly: true }).toArray();
     const seoCollectionNames = collectionMetadata
       .map(item => item.name)
-      .filter(isSeoPageCollection)
-      .sort((a, b) => a.localeCompare(b));
+      .filter(isSeoPageCollection);
 
-    for (const collectionName of seoCollectionNames) {
-      const doc = await db
-        .collection(collectionName)
-        .findOne({ pageUrl: { $in: pageUrlCandidates } });
-      if (doc && hasAnySeoValue(doc)) {
-        return res.status(200).json({ ok: true, data: doc, collection: collectionName });
-      }
+    // The same pageUrl may exist across multiple hierarchy collections (legacy + new
+    // hierarchy). Collect every match and return the most-recently-updated one so the
+    // latest panel edit always wins regardless of collection name order.
+    const matches = await Promise.all(
+      seoCollectionNames.map(async collectionName => {
+        const doc = await db
+          .collection(collectionName)
+          .findOne({ pageUrl: { $in: pageUrlCandidates } });
+        return { collectionName, doc };
+      })
+    );
+
+    const validMatches = matches.filter(({ doc }) => doc && hasAnySeoValue(doc));
+
+    if (validMatches.length) {
+      const best = validMatches.reduce((acc, current) => {
+        const accTime = acc.doc.updatedAt ? new Date(acc.doc.updatedAt).getTime() : 0;
+        const curTime = current.doc.updatedAt ? new Date(current.doc.updatedAt).getTime() : 0;
+        return curTime > accTime ? current : acc;
+      });
+
+      return res.status(200).json({ ok: true, data: best.doc, collection: best.collectionName });
     }
 
     return res.status(200).json({
