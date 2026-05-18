@@ -119,7 +119,7 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'LastName', Value: lastName },
     { Attribute: 'Phone', Value: safePhone },
     { Attribute: 'EmailAddress', Value: email },
-    { Attribute: 'mx_Center_Name', Value: center },
+    { Attribute: 'mx_Centerr_Location', Value: center },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
   ].filter(entry => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');

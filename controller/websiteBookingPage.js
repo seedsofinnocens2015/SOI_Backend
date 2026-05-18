@@ -116,7 +116,7 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'EmailAddress', Value: email },
     { Attribute: 'mx_City', Value: city },
     { Attribute: 'mx_State', Value: state },
-    { Attribute: 'mx_Center_Name', Value: centre },
+    { Attribute: 'mx_Centerr_Location', Value: centre },
     { Attribute: 'mx_Center_Location', Value: centerLocation },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
