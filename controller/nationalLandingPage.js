@@ -114,6 +114,7 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
   const payload = [
     { Attribute: 'FirstName', Value: safeFullName },
     { Attribute: 'Phone', Value: safePhone },
+    { Attribute: 'mx_Centerr_Location', Value: center },
     { Attribute: 'Notes', Value: notes },
   ].filter((entry) => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');
 
