@@ -69,6 +69,18 @@ const splitName = (fullName) => {
   return { firstName, lastName };
 };
 
+const validateCaptcha = ({ captchaAccepted }) => {
+  if (captchaAccepted === undefined) return;
+
+  const isAccepted = captchaAccepted === true || String(captchaAccepted).toLowerCase() === 'true';
+
+  if (!isAccepted) {
+    const error = new Error('Please confirm that you are not a robot.');
+    error.status = 400;
+    throw error;
+  }
+};
+
 const buildLeadSquaredPayload = (formData) => {
   const {
     name = '',
@@ -80,9 +92,12 @@ const buildLeadSquaredPayload = (formData) => {
 
   const leadSource = 'New Website Form';
 
+  validateCaptcha(formData);
+
   const safePhone = sanitizePhone(phone);
-  if (!name || !safePhone) {
-    const error = new Error('Missing required fields: name and phone');
+  const selectedCenter = String(center || '').trim();
+  if (!name || !safePhone || !selectedCenter) {
+    const error = new Error('Missing required fields: name, phone and center');
     error.status = 400;
     throw error;
   }
@@ -91,7 +106,7 @@ const buildLeadSquaredPayload = (formData) => {
 
   // Build appointment details for notes
   const appointmentDetails = [
-    `Center: ${center || 'NA'}`,
+    `Center: ${selectedCenter || 'NA'}`,
   ].filter(item => !item.includes('NA')).join(' | ');
 
   const notesMessage = message 
@@ -100,7 +115,7 @@ const buildLeadSquaredPayload = (formData) => {
 
   // Full message for email (includes all details)
   const fullMessage = [
-    `Center: ${center || 'NA'}`,
+    `Center: ${selectedCenter || 'NA'}`,
     message ? `Message: ${message}` : '',
   ].filter(Boolean).join(' | ');
 
@@ -109,7 +124,7 @@ const buildLeadSquaredPayload = (formData) => {
     lastName,
     phone: safePhone,
     email,
-    center,
+    center: selectedCenter,
     message: fullMessage,
     source: leadSource,
   };
@@ -119,7 +134,7 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'LastName', Value: lastName },
     { Attribute: 'Phone', Value: safePhone },
     { Attribute: 'EmailAddress', Value: email },
-    { Attribute: 'mx_Centerr_Location', Value: center },
+    { Attribute: 'mx_Centerr_Location', Value: selectedCenter },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
   ].filter(entry => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');
