@@ -88,6 +88,9 @@ const buildLeadSquaredPayload = (formData) => {
     email = '',
     center = '',
     message = '',
+    utm_source = '',
+    utm_medium = '',
+    utm_campaign = '',
   } = formData;
 
   const leadSource = 'New Website Form';
@@ -103,6 +106,9 @@ const buildLeadSquaredPayload = (formData) => {
   }
 
   const { firstName, lastName } = splitName(name);
+  const safeUtmSource = String(utm_source || '').trim();
+  const safeUtmMedium = String(utm_medium || '').trim();
+  const safeUtmCampaign = String(utm_campaign || '').trim();
 
   // Build appointment details for notes
   const appointmentDetails = [
@@ -127,6 +133,9 @@ const buildLeadSquaredPayload = (formData) => {
     center: selectedCenter,
     message: fullMessage,
     source: leadSource,
+    utm_source: safeUtmSource,
+    utm_medium: safeUtmMedium,
+    utm_campaign: safeUtmCampaign,
   };
 
   const payload = [
@@ -137,6 +146,9 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'mx_Centerr_Location', Value: selectedCenter },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
+    { Attribute: 'mx_utm_source', Value: safeUtmSource },
+    { Attribute: 'mx_utm_medium', Value: safeUtmMedium },
+    { Attribute: 'mx_utm_campaign', Value: safeUtmCampaign },
   ].filter(entry => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');
 
   return {
@@ -197,6 +209,9 @@ const sendNotificationEmail = async (formData, options = {}) => {
     email: formData.email,
     center: formData.center,
     message: formData.message,
+    utm_source: formData.utm_source,
+    utm_medium: formData.utm_medium,
+    utm_campaign: formData.utm_campaign,
   };
 
   if (leadSquaredStatus) {
@@ -284,6 +299,9 @@ const createBookAppointment = async (req, res) => {
       center: normalized.center,
       message: normalized.message,
       source: normalized.source,
+      ...(normalized.utm_source && { utm_source: normalized.utm_source }),
+      ...(normalized.utm_medium && { utm_medium: normalized.utm_medium }),
+      ...(normalized.utm_campaign && { utm_campaign: normalized.utm_campaign }),
     };
 
     let leadSquaredResponse;
