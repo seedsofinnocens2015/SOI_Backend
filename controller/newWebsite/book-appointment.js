@@ -60,6 +60,14 @@ const sanitizePhone = (phone) => {
   return String(phone).replace(/\D/g, '').slice(-10);
 };
 
+const validateIndianPhone = (phone) => {
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    const error = new Error('Invalid number');
+    error.status = 400;
+    throw error;
+  }
+};
+
 const splitName = (fullName) => {
   if (!fullName) return { firstName: '', lastName: '' };
   const parts = fullName.trim().split(/\s+/);
@@ -104,6 +112,7 @@ const buildLeadSquaredPayload = (formData) => {
     error.status = 400;
     throw error;
   }
+  validateIndianPhone(safePhone);
 
   const { firstName, lastName } = splitName(name);
   const safeUtmSource = String(utm_source || '').trim();
