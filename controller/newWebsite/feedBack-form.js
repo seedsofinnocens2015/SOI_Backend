@@ -107,16 +107,26 @@ const createUnifiedFormSubmission = async (req, res) => {
       feedbackType: getFormValue(req.body, 'feedbackType'),
       rating: getFormValue(req.body, 'rating'),
       feedback: getFormValue(req.body, 'feedback'),
+      agree: getFormValue(req.body, 'agree'),
       submittedAt: new Date().toISOString(),
     };
 
-    if (!payload.name || !payload.feedbackType || !payload.rating || !payload.feedback) {
+    if (
+      !payload.name ||
+      !payload.email ||
+      !payload.phone ||
+      !payload.center ||
+      !payload.feedbackType ||
+      !payload.rating ||
+      !payload.feedback ||
+      !payload.agree
+    ) {
       return res.status(400).json({
         ok: false,
         error: 'Missing required feedback fields.',
       });
     }
-    if (payload.email && !isValidEmail(payload.email)) {
+    if (!isValidEmail(payload.email)) {
       return res.status(400).json({
         ok: false,
         error: 'Invalid email address.',
