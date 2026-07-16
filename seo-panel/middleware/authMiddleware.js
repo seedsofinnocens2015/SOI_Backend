@@ -15,7 +15,32 @@ function protectSeoAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
-    req.seoUser = decoded;
+    const role = decoded.role || 'seo';
+    if (!['seo', 'admin'].includes(role)) {
+      return res.status(403).json({ ok: false, error: 'Forbidden: SEO access required' });
+    }
+    req.seoUser = { ...decoded, role };
+    return next();
+  } catch (_error) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized: invalid token' });
+  }
+}
+
+function protectHrAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+
+  if (!token) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized: token missing' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, getJwtSecret());
+    const role = decoded.role || 'seo';
+    if (!['hr', 'admin'].includes(role)) {
+      return res.status(403).json({ ok: false, error: 'Forbidden: HR access required' });
+    }
+    req.seoUser = { ...decoded, role };
     return next();
   } catch (_error) {
     return res.status(401).json({ ok: false, error: 'Unauthorized: invalid token' });
@@ -24,4 +49,5 @@ function protectSeoAuth(req, res, next) {
 
 module.exports = {
   protectSeoAuth,
+  protectHrAuth,
 };

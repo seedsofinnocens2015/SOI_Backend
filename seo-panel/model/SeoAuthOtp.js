@@ -11,6 +11,7 @@ const seoAuthOtpSchema = new Schema(
     attemptsLeft: { type: Number, default: 5 },
     pendingSignupName: { type: String, default: '' },
     pendingSignupPassword: { type: String, default: '' },
+    pendingRole: { type: String, enum: ['seo', 'hr'], default: 'seo' },
     pendingLoginUserId: { type: Schema.Types.ObjectId, default: null },
   },
   { timestamps: true }

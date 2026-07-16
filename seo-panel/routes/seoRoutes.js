@@ -5,6 +5,7 @@ const { protectSeoAuth } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.get('/resolved', getSeoResolved);
+// Public read is retained because the main website resolves live metadata here.
 router.get('/', getSeo);
 router.get('/stats', protectSeoAuth, getSeoStats);
 router.post('/', protectSeoAuth, saveSeo);

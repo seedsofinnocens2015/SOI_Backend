@@ -7,6 +7,7 @@ const SeoAuthOtp = require('../model/SeoAuthOtp');
 
 const JWT_EXPIRY = '7d';
 const ALLOWED_EMAIL_DOMAINS = ['@seedsofinnocence.com', '@seedsofinnocens.com'];
+const ADMIN_EMAILS = new Set(['amitkumaryadav8314@gmail.com']);
 const OTP_TTL_SECONDS = 60;
 const OTP_ATTEMPTS = 5;
 
@@ -31,12 +32,30 @@ function normalizeEmail(email = '') {
   return String(email || '').trim().toLowerCase();
 }
 
-function isAllowedEmailDomain(email = '') {
-  return ALLOWED_EMAIL_DOMAINS.some((domain) => email.endsWith(domain));
+function normalizeRole(role = '') {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  return ['seo', 'hr'].includes(normalizedRole) ? normalizedRole : '';
 }
 
-function createAuthResponse(user) {
-  const payload = { userId: user._id, email: user.email };
+function isAdminEmail(email = '') {
+  return ADMIN_EMAILS.has(normalizeEmail(email));
+}
+
+function getEffectiveRole(user) {
+  if (isAdminEmail(user?.email)) return 'admin';
+  return ['seo', 'hr', 'admin'].includes(user?.role) ? user.role : 'seo';
+}
+
+function isAllowedEmailDomain(email = '') {
+  return isAdminEmail(email) || ALLOWED_EMAIL_DOMAINS.some((domain) => email.endsWith(domain));
+}
+
+function createAuthResponse(user, requestedRole = 'seo') {
+  // Users created before role support are SEO users by default. This fallback
+  // keeps every existing account working without a database migration.
+  const role = getEffectiveRole(user);
+  const activeRole = role === 'admin' ? normalizeRole(requestedRole) || 'seo' : role;
+  const payload = { userId: user._id, email: user.email, role, activeRole };
   const token = jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRY });
   return {
     token,
@@ -44,6 +63,8 @@ function createAuthResponse(user) {
       id: user._id,
       name: user.name,
       email: user.email,
+      role,
+      activeRole,
     },
   };
 }
@@ -83,7 +104,7 @@ async function sendOtpEmail({ email, otpCode, purpose }) {
   const actionLabel = purpose === 'signup' ? 'signup' : 'login';
   const html = `
     <div style="font-family:Arial,sans-serif;">
-      <h2 style="margin:0 0 12px;color:#c62828;">SEO Panel OTP Verification</h2>
+      <h2 style="margin:0 0 12px;color:#c62828;">SOI Panel OTP Verification</h2>
       <p style="margin:0 0 8px;">Use the OTP below to complete your ${actionLabel}.</p>
       <p style="font-size:28px;letter-spacing:4px;font-weight:700;margin:12px 0;color:#111827;">${otpCode}</p>
       <p style="margin:0;color:#4b5563;">This OTP is valid for 1 minute.</p>
@@ -93,7 +114,7 @@ async function sendOtpEmail({ email, otpCode, purpose }) {
   await mailer.sendMail({
     from: EMAIL_FROM,
     to: email,
-    subject: `SEO Panel OTP for ${actionLabel}`,
+    subject: `SOI Panel OTP for ${actionLabel}`,
     html,
   });
 }
@@ -103,9 +124,10 @@ async function requestSignupOtp(req, res) {
     const name = String(req.body?.name || '').trim();
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || '');
+    const role = normalizeRole(req.body?.role);
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ ok: false, error: 'Name, email and password are required' });
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ ok: false, error: 'Name, email, password and role are required' });
     }
 
     if (!isAllowedEmailDomain(email)) {
@@ -125,6 +147,13 @@ async function requestSignupOtp(req, res) {
       return res.status(409).json({ ok: false, error: 'User already exists with this email' });
     }
 
+    // This single owner account is intentionally password-only. The exception
+    // is enforced on the server so no other email can bypass OTP from the UI.
+    if (isAdminEmail(email)) {
+      const user = await SeoUser.create({ name, email, password, role: 'admin' });
+      return res.status(201).json({ ok: true, data: createAuthResponse(user, role) });
+    }
+
     const otpCode = generateOtpCode();
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
 
@@ -138,6 +167,7 @@ async function requestSignupOtp(req, res) {
         attemptsLeft: OTP_ATTEMPTS,
         pendingSignupName: name,
         pendingSignupPassword: password,
+        pendingRole: role,
         pendingLoginUserId: null,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -185,10 +215,11 @@ async function verifySignupOtp(req, res) {
       name: pendingOtp.pendingSignupName,
       email,
       password: pendingOtp.pendingSignupPassword,
+      role: isAdminEmail(email) ? 'admin' : normalizeRole(pendingOtp.pendingRole) || 'seo',
     });
     await pendingOtp.deleteOne();
 
-    return res.status(201).json({ ok: true, data: createAuthResponse(user) });
+    return res.status(201).json({ ok: true, data: createAuthResponse(user, pendingOtp.pendingRole) });
   } catch (error) {
     console.error('[SEO][auth][verifySignupOtp] Error', error);
     return res.status(500).json({ ok: false, error: 'Failed to verify OTP' });
@@ -199,9 +230,10 @@ async function requestLoginOtp(req, res) {
   try {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || '');
+    const role = normalizeRole(req.body?.role);
 
-    if (!email || !password) {
-      return res.status(400).json({ ok: false, error: 'Email and password are required' });
+    if (!email || !password || !role) {
+      return res.status(400).json({ ok: false, error: 'Email, password and role are required' });
     }
 
     if (password.length < 10) {
@@ -218,6 +250,18 @@ async function requestLoginOtp(req, res) {
       return res.status(401).json({ ok: false, error: 'Invalid email or password' });
     }
 
+    const userRole = getEffectiveRole(user);
+    if (userRole !== 'admin' && userRole !== role) {
+      return res.status(403).json({
+        ok: false,
+        error: `This account is registered for the ${userRole.toUpperCase()} panel`,
+      });
+    }
+
+    if (isAdminEmail(email)) {
+      return res.status(200).json({ ok: true, data: createAuthResponse(user, role) });
+    }
+
     const otpCode = generateOtpCode();
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
 
@@ -231,6 +275,7 @@ async function requestLoginOtp(req, res) {
         attemptsLeft: OTP_ATTEMPTS,
         pendingSignupName: '',
         pendingSignupPassword: '',
+        pendingRole: role,
         pendingLoginUserId: user._id,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -275,7 +320,7 @@ async function verifyLoginOtp(req, res) {
     }
 
     await pendingOtp.deleteOne();
-    return res.status(200).json({ ok: true, data: createAuthResponse(user) });
+    return res.status(200).json({ ok: true, data: createAuthResponse(user, pendingOtp.pendingRole) });
   } catch (error) {
     console.error('[SEO][auth][verifyLoginOtp] Error', error);
     return res.status(500).json({ ok: false, error: 'Failed to verify OTP' });

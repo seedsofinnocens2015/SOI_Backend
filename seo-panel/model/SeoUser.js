@@ -20,6 +20,12 @@ const seoUserSchema = new Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: String,
+      enum: ['seo', 'hr', 'admin'],
+      default: 'seo',
+      required: true,
+    },
   },
   { timestamps: true }
 );

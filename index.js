@@ -10,6 +10,8 @@ const nationalLandingRoutes = require('./routes/nationalLandingPageRoutes');
 const newWebsiteRoutes = require('./routes/newWebsiteRoutes');
 const seoRoutes = require('./seo-panel/routes/seoRoutes');
 const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
+const jobRoutes = require('./seo-panel/routes/jobRoutes');
+const jobApplicationRoutes = require('./seo-panel/routes/jobApplicationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || runtimeConfig.PORT;
@@ -99,6 +101,8 @@ app.use('/api/landing-pages', nationalLandingRoutes);
 app.use('/api/new-website', newWebsiteRoutes);
 app.use('/api/seo-auth', seoAuthRoutes);
 app.use('/api/seo', seoRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/job-applications', jobApplicationRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error', err);
