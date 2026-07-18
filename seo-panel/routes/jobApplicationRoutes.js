@@ -3,10 +3,13 @@ const multer = require('multer');
 const path = require('path');
 const {
   createApplication,
+  createGeneralApplication,
   listApplications,
   getApplication,
   downloadResume,
+  updateApplication,
   updateApplicationStatus,
+  deleteApplication,
 } = require('../controller/jobApplicationController');
 const { protectHrAuth } = require('../middleware/authMiddleware');
 
@@ -39,9 +42,12 @@ function uploadResume(req, res, next) {
 }
 
 router.post('/', uploadResume, createApplication);
+router.post('/general', uploadResume, createGeneralApplication);
 router.get('/manage', protectHrAuth, listApplications);
 router.get('/:id', protectHrAuth, getApplication);
 router.get('/:id/resume', protectHrAuth, downloadResume);
+router.patch('/:id', protectHrAuth, updateApplication);
 router.patch('/:id/status', protectHrAuth, updateApplicationStatus);
+router.delete('/:id', protectHrAuth, deleteApplication);
 
 module.exports = router;

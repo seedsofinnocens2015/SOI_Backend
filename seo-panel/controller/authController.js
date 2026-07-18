@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const bcrypt = require('bcryptjs');
 const runtimeConfig = require('../../config/runtimeConfig');
 
 const SeoUser = require('../model/SeoUser');
@@ -10,6 +11,7 @@ const ALLOWED_EMAIL_DOMAINS = ['@seedsofinnocence.com', '@seedsofinnocens.com'];
 const ADMIN_EMAILS = new Set(['amitkumaryadav8314@gmail.com']);
 const OTP_TTL_SECONDS = 60;
 const OTP_ATTEMPTS = 5;
+const PASSWORD_SALT_ROUNDS = 12;
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
@@ -48,6 +50,22 @@ function getEffectiveRole(user) {
 
 function isAllowedEmailDomain(email = '') {
   return isAdminEmail(email) || ALLOWED_EMAIL_DOMAINS.some((domain) => email.endsWith(domain));
+}
+
+function isPasswordHash(password = '') {
+  return /^\$2[aby]\$/.test(String(password || ''));
+}
+
+async function hashPassword(password) {
+  return bcrypt.hash(String(password), PASSWORD_SALT_ROUNDS);
+}
+
+async function passwordMatches(password, storedPassword) {
+  if (isPasswordHash(storedPassword)) {
+    return bcrypt.compare(String(password), String(storedPassword));
+  }
+  // Backward compatibility for accounts created before password hashing was added.
+  return String(password) === String(storedPassword || '');
 }
 
 function createAuthResponse(user, requestedRole = 'seo') {
@@ -101,7 +119,7 @@ async function sendOtpEmail({ email, otpCode, purpose }) {
     throw error;
   }
 
-  const actionLabel = purpose === 'signup' ? 'signup' : 'login';
+  const actionLabel = purpose === 'signup' ? 'signup' : purpose === 'reset' ? 'password reset' : 'login';
   const html = `
     <div style="font-family:Arial,sans-serif;">
       <h2 style="margin:0 0 12px;color:#c62828;">SOI Panel OTP Verification</h2>
@@ -150,7 +168,7 @@ async function requestSignupOtp(req, res) {
     // This single owner account is intentionally password-only. The exception
     // is enforced on the server so no other email can bypass OTP from the UI.
     if (isAdminEmail(email)) {
-      const user = await SeoUser.create({ name, email, password, role: 'admin' });
+      const user = await SeoUser.create({ name, email, password: await hashPassword(password), role: 'admin' });
       return res.status(201).json({ ok: true, data: createAuthResponse(user, role) });
     }
 
@@ -214,7 +232,7 @@ async function verifySignupOtp(req, res) {
     const user = await SeoUser.create({
       name: pendingOtp.pendingSignupName,
       email,
-      password: pendingOtp.pendingSignupPassword,
+      password: await hashPassword(pendingOtp.pendingSignupPassword),
       role: isAdminEmail(email) ? 'admin' : normalizeRole(pendingOtp.pendingRole) || 'seo',
     });
     await pendingOtp.deleteOne();
@@ -245,7 +263,7 @@ async function requestLoginOtp(req, res) {
       return res.status(401).json({ ok: false, error: 'Invalid email or password' });
     }
 
-    const isPasswordValid = password === String(user.password || '');
+    const isPasswordValid = await passwordMatches(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ ok: false, error: 'Invalid email or password' });
     }
@@ -327,9 +345,248 @@ async function verifyLoginOtp(req, res) {
   }
 }
 
+async function requestPasswordResetOtp(req, res) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!email) {
+      return res.status(400).json({ ok: false, error: 'Email is required' });
+    }
+
+    const user = await SeoUser.findOne({ email }).select('_id email').lean();
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'No SOI Panel account found with this email' });
+    }
+
+    const otpCode = generateOtpCode();
+    const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
+    await SeoAuthOtp.findOneAndUpdate(
+      { email, purpose: 'reset' },
+      {
+        email,
+        purpose: 'reset',
+        otpCode,
+        expiresAt,
+        attemptsLeft: OTP_ATTEMPTS,
+        pendingSignupName: '',
+        pendingSignupPassword: '',
+        pendingRole: 'seo',
+        pendingLoginUserId: user._id,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Password recovery always requires OTP, including the Full Admin account.
+    await sendOtpEmail({ email, otpCode, purpose: 'reset' });
+    return res.status(200).json({
+      ok: true,
+      data: { message: 'Password reset OTP sent to your email', expiresInSeconds: OTP_TTL_SECONDS },
+    });
+  } catch (error) {
+    console.error('[SEO][auth][requestPasswordResetOtp] Error', error);
+    return res.status(error.status || 500).json({ ok: false, error: error.message || 'Failed to send password reset OTP' });
+  }
+}
+
+async function resetPasswordWithOtp(req, res) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const otpCode = String(req.body?.otp || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!email || !otpCode || !password) {
+      return res.status(400).json({ ok: false, error: 'Email, OTP and new password are required' });
+    }
+    if (password.length < 10) {
+      return res.status(400).json({ ok: false, error: 'Password must be at least 10 characters' });
+    }
+    if (password.length > 128) {
+      return res.status(400).json({ ok: false, error: 'Password is too long' });
+    }
+
+    const pendingOtp = await SeoAuthOtp.findOne({ email, purpose: 'reset' });
+    if (!pendingOtp || pendingOtp.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ ok: false, error: 'OTP expired or not found. Please request a new OTP.' });
+    }
+
+    if (pendingOtp.otpCode !== otpCode) {
+      pendingOtp.attemptsLeft = Math.max(0, (pendingOtp.attemptsLeft || 0) - 1);
+      if (pendingOtp.attemptsLeft <= 0) {
+        await pendingOtp.deleteOne();
+        return res.status(400).json({ ok: false, error: 'Too many invalid attempts. Request OTP again.' });
+      }
+      await pendingOtp.save();
+      return res.status(400).json({ ok: false, error: `Invalid OTP. Attempts left: ${pendingOtp.attemptsLeft}` });
+    }
+
+    const user = await SeoUser.findOne({ _id: pendingOtp.pendingLoginUserId, email });
+    if (!user) {
+      await pendingOtp.deleteOne();
+      return res.status(404).json({ ok: false, error: 'Panel account not found' });
+    }
+
+    user.password = await hashPassword(password);
+    await user.save();
+    await SeoAuthOtp.deleteMany({ email, purpose: { $in: ['reset', 'login'] } });
+
+    return res.status(200).json({
+      ok: true,
+      data: { message: 'Password reset successfully. You can now login with your new password.' },
+    });
+  } catch (error) {
+    console.error('[SEO][auth][resetPasswordWithOtp] Error', error);
+    return res.status(500).json({ ok: false, error: 'Unable to reset password' });
+  }
+}
+
+async function listUsersForPanel(panelRole, res) {
+  try {
+    const roleFilter = panelRole === 'seo'
+      ? {
+          $and: [
+            { email: { $nin: Array.from(ADMIN_EMAILS) } },
+            { $or: [{ role: 'seo' }, { role: { $exists: false } }] },
+          ],
+        }
+      : { role: 'hr', email: { $nin: Array.from(ADMIN_EMAILS) } };
+    const users = await SeoUser.find(roleFilter)
+      .select('_id name email role createdAt')
+      .sort({ name: 1, email: 1 })
+      .lean();
+
+    return res.status(200).json({
+      ok: true,
+      data: users.map((user) => ({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: panelRole,
+        createdAt: user.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error(`[SEO][auth][list${panelRole.toUpperCase()}Users] Error`, error);
+    return res.status(500).json({ ok: false, error: 'Unable to load panel users' });
+  }
+}
+
+function listSeoPanelUsers(_req, res) {
+  return listUsersForPanel('seo', res);
+}
+
+function listHrPanelUsers(_req, res) {
+  return listUsersForPanel('hr', res);
+}
+
+async function updatePanelUser(req, res) {
+  try {
+    const userId = String(req.params?.userId || '').trim();
+    const name = String(req.body?.name || '').trim();
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || '');
+
+    if (!userId || !name || !email) {
+      return res.status(400).json({ ok: false, error: 'Name and email are required' });
+    }
+
+    if (!isAllowedEmailDomain(email) || isAdminEmail(email)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Use a valid company email for this user',
+      });
+    }
+
+    if (password && password.length < 10) {
+      return res.status(400).json({ ok: false, error: 'Password must be at least 10 characters' });
+    }
+
+    if (password.length > 128) {
+      return res.status(400).json({ ok: false, error: 'Password is too long' });
+    }
+
+    const user = await SeoUser.findOne({
+      _id: userId,
+      role: { $ne: 'admin' },
+      email: { $nin: Array.from(ADMIN_EMAILS) },
+    });
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'Panel user not found' });
+    }
+
+    const duplicateUser = await SeoUser.findOne({ email, _id: { $ne: user._id } }).lean();
+    if (duplicateUser) {
+      return res.status(409).json({ ok: false, error: 'Another user already uses this email' });
+    }
+
+    user.name = name;
+    user.email = email;
+    if (password) user.password = await hashPassword(password);
+    await user.save();
+
+    return res.status(200).json({
+      ok: true,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: getEffectiveRole(user),
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    if (error?.name === 'CastError') {
+      return res.status(404).json({ ok: false, error: 'Panel user not found' });
+    }
+    if (error?.code === 11000) {
+      return res.status(409).json({ ok: false, error: 'Another user already uses this email' });
+    }
+    console.error('[SEO][auth][updatePanelUser] Error', error);
+    return res.status(500).json({ ok: false, error: 'Unable to update panel user' });
+  }
+}
+
+async function deletePanelUser(req, res) {
+  try {
+    const userId = String(req.params?.userId || '').trim();
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: 'Panel user is required' });
+    }
+
+    const user = await SeoUser.findOne({
+      _id: userId,
+      role: { $ne: 'admin' },
+      email: { $nin: Array.from(ADMIN_EMAILS) },
+    });
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'Panel user not found' });
+    }
+
+    await Promise.all([
+      SeoAuthOtp.deleteMany({ email: user.email }),
+      user.deleteOne(),
+    ]);
+
+    return res.status(200).json({
+      ok: true,
+      data: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (error) {
+    if (error?.name === 'CastError') {
+      return res.status(404).json({ ok: false, error: 'Panel user not found' });
+    }
+    console.error('[SEO][auth][deletePanelUser] Error', error);
+    return res.status(500).json({ ok: false, error: 'Unable to delete panel user' });
+  }
+}
+
 module.exports = {
   requestSignupOtp,
   verifySignupOtp,
   requestLoginOtp,
   verifyLoginOtp,
+  requestPasswordResetOtp,
+  resetPasswordWithOtp,
+  listSeoPanelUsers,
+  listHrPanelUsers,
+  updatePanelUser,
+  deletePanelUser,
 };

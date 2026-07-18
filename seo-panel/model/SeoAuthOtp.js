@@ -5,7 +5,7 @@ const { Schema } = mongoose;
 const seoAuthOtpSchema = new Schema(
   {
     email: { type: String, required: true, lowercase: true, trim: true },
-    purpose: { type: String, required: true, enum: ['signup', 'login'] },
+    purpose: { type: String, required: true, enum: ['signup', 'login', 'reset'] },
     otpCode: { type: String, required: true },
     expiresAt: { type: Date, required: true },
     attemptsLeft: { type: Number, default: 5 },

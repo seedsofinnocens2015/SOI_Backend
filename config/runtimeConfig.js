@@ -5,6 +5,7 @@ const runtimeConfig = {
     'http://localhost:3000,https://www.seedsofinnocens.com,https://www.seedsofinnocence.com,https://seeds.seedsofinnocens.com,https://soi-admin.seedsofinnocens.com,http://localhost:4000',
   RECEIVER_EMAIL: 'digital@seedsofinnocence.com',
   FEEDBACK_RECEIVER_EMAIL: 'feedback@seedsofinnocence.com',
+  CAREERS_RECEIVER_EMAIL: 'career@seedsofinnocence.com',
   SEO_AUTH_JWT_SECRET: 'change-this-seo-secret',
   LSQ_BASE_URL: 'https://api-in21.leadsquared.com',
   LSQ_ACCESS_KEY: 'u$re4c970aee03a36630af47605bf4675fa',
