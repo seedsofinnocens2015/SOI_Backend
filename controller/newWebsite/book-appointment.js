@@ -77,6 +77,35 @@ const splitName = (fullName) => {
   return { firstName, lastName };
 };
 
+const normalizeCenterName = (center) => {
+  const rawCenter = String(center || '').trim().replace(/^\*+\s*/, '');
+  if (!rawCenter) return '';
+
+  // Display names are stored as "City, State". LSQ only needs the city.
+  if (rawCenter.includes(',')) return rawCenter.split(',')[0].trim();
+
+  // Backward compatibility for clients that still submit centre slugs.
+  const stateSuffixes = [
+    'andaman-and-nicobar-islands', 'andhra-pradesh', 'arunachal-pradesh',
+    'dadra-and-nagar-haveli-and-daman-and-diu', 'himachal-pradesh',
+    'jammu-and-kashmir', 'madhya-pradesh', 'tamil-nadu', 'uttar-pradesh',
+    'uttarakhand', 'west-bengal', 'chhattisgarh', 'maharashtra', 'meghalaya',
+    'telangana', 'karnataka', 'jharkhand', 'haryana', 'gujarat', 'rajasthan',
+    'punjab', 'odisha', 'assam', 'bihar', 'goa', 'kerala', 'manipur',
+    'mizoram', 'nagaland', 'sikkim', 'tripura', 'delhi', 'chandigarh',
+    'ladakh', 'puducherry',
+  ];
+  const slug = rawCenter.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const stateSuffix = stateSuffixes.find((state) => slug.endsWith(`-${state}`));
+  const citySlug = stateSuffix ? slug.slice(0, -(stateSuffix.length + 1)) : slug;
+
+  return citySlug
+    .split('-')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 const validateCaptcha = ({ captchaAccepted }) => {
   if (captchaAccepted === undefined) return;
 
@@ -106,7 +135,7 @@ const buildLeadSquaredPayload = (formData) => {
   validateCaptcha(formData);
 
   const safePhone = sanitizePhone(phone);
-  const selectedCenter = String(center || '').trim();
+  const selectedCenter = normalizeCenterName(center);
   if (!name || !safePhone || !selectedCenter) {
     const error = new Error('Missing required fields: name, phone and center');
     error.status = 400;
