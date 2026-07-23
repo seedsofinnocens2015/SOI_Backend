@@ -5,17 +5,35 @@ const { deleteResume, getSignedResumeUrl, uploadResume } = require('../services/
 const { sendApplicationNotificationEmail } = require('../services/applicationEmailService');
 
 const APPLICATION_STATUSES = ['new', 'reviewing', 'shortlisted', 'rejected', 'hired'];
-const DEPARTMENT_LABELS = {
-  medical: 'Medical',
-  laboratory: 'Laboratory',
-  nursing: 'Nursing',
-  administration: 'Administration',
-  marketing: 'Marketing',
-  finance: 'Finance',
-  hr: 'Human Resources',
-  it: 'IT / Technology',
-  other: 'Other',
-};
+const GENERAL_APPLICATION_JOB_FIELDS = [
+  'Accounts & Finance',
+  'Admin & Operations',
+  'Billing',
+  'Business Development',
+  'Call Center',
+  'Clinical Operations',
+  'Digital Marketing',
+  'Embryology',
+  'Facility & Maintenance',
+  'Field Operations',
+  'Human Resources',
+  'IT',
+  'IVF',
+  'Lab Operations',
+  'Management',
+  'Molecular Biology',
+  'Nursing',
+  'OT Operations',
+  'Pathology',
+  'Patient Coordination',
+  'Pharmacy',
+  'Purchase & Procurement',
+  'Quality & Compliances',
+  'Sales & Marketing',
+];
+const GENERAL_APPLICATION_JOB_FIELD_LABELS = Object.fromEntries(
+  GENERAL_APPLICATION_JOB_FIELDS.map(label => [label.toLowerCase(), label])
+);
 
 const clean = value => String(value || '').trim();
 
@@ -166,7 +184,7 @@ async function createGeneralApplication(req, res) {
     }
 
     uploadedResume = await uploadResume(req.file, fields.fullName);
-    const departmentLabel = DEPARTMENT_LABELS[fields.department] || fields.department;
+    const departmentLabel = GENERAL_APPLICATION_JOB_FIELD_LABELS[fields.department] || fields.department;
     const application = await JobApplication.create({
       applicationType: 'general',
       positionTitle: fields.preferredPosition,
@@ -318,7 +336,9 @@ async function updateApplication(req, res) {
           ...normalizedFields,
           positionTitle: normalizedFields.preferredPosition,
           positionLocation: normalizedFields.currentLocation,
-          jobField: DEPARTMENT_LABELS[normalizedFields.department] || normalizedFields.department,
+          jobField:
+            GENERAL_APPLICATION_JOB_FIELD_LABELS[normalizedFields.department] ||
+            normalizedFields.department,
           coverLetter: normalizedFields.additionalInfo,
         }
       : normalizedFields;
