@@ -318,7 +318,9 @@ const isDuplicateLeadSquaredError = (error) => {
   const message = `${error?.message || ''} ${stringified}`.toLowerCase();
   return status === 409 || message.includes('duplicate');
 };
-
+console.log("LSQ_BASE_URL:", process.env.LSQ_BASE_URL);
+console.log("LSQ_ACCESS_KEY:", process.env.LSQ_ACCESS_KEY?.substring(0, 8));
+console.log("LSQ_SECRET_KEY:", process.env.LSQ_SECRET_KEY?.substring(0, 8));
 const createBookAppointment = async (req, res) => {
   try {
     const submittedAt = new Date();
