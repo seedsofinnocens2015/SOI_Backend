@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
+const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
 
 const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
 const SMTP_PORT = cleanEnvValue(process.env.SMTP_PORT || runtimeConfig.SMTP_PORT);
@@ -18,10 +19,10 @@ const LEADSQUARED_BASE_URL = cleanEnvValue(
 const LEADSQUARED_ENDPOINT = cleanEnvValue(
   process.env.LSQ_ENDPOINT || process.env.LEADSQUARED_ENDPOINT || process.env.LEADSQUARED_URL || ''
 );
-const LEADSQUARED_ACCESS_KEY = cleanEnvValue(
+const LEADSQUARED_ACCESS_KEY = cleanLeadSquaredCredential(
   process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || runtimeConfig.LSQ_ACCESS_KEY
 );
-const LEADSQUARED_SECRET_KEY = cleanEnvValue(
+const LEADSQUARED_SECRET_KEY = cleanLeadSquaredCredential(
   process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || runtimeConfig.LSQ_SECRET_KEY
 );
 const NOTIFICATION_EMAIL = cleanEnvValue(
@@ -318,10 +319,6 @@ const isDuplicateLeadSquaredError = (error) => {
   const message = `${error?.message || ''} ${stringified}`.toLowerCase();
   return status === 409 || message.includes('duplicate');
 };
-console.log("RAW ACCESS KEY:", JSON.stringify(process.env.LSQ_ACCESS_KEY));
-console.log("RAW SECRET KEY:", JSON.stringify(process.env.LSQ_SECRET_KEY));
-console.log("ACCESS KEY LENGTH:", process.env.LSQ_ACCESS_KEY?.length);
-console.log("SECRET KEY LENGTH:", process.env.LSQ_SECRET_KEY?.length);
 const createBookAppointment = async (req, res) => {
   try {
     const submittedAt = new Date();

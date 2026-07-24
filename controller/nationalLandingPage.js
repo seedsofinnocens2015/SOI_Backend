@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const runtimeConfig = require('../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
+const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
 
 // SMTP / email config
 const SMTP_HOST = cleanEnvValue(process.env.SMTP_HOST || runtimeConfig.SMTP_HOST);
@@ -19,10 +20,10 @@ const LEADSQUARED_BASE_URL = cleanEnvValue(
 const LEADSQUARED_ENDPOINT = cleanEnvValue(
   process.env.LSQ_ENDPOINT || process.env.LEADSQUARED_ENDPOINT || process.env.LEADSQUARED_URL || ''
 );
-const LEADSQUARED_ACCESS_KEY = cleanEnvValue(
+const LEADSQUARED_ACCESS_KEY = cleanLeadSquaredCredential(
   process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || runtimeConfig.LSQ_ACCESS_KEY
 );
-const LEADSQUARED_SECRET_KEY = cleanEnvValue(
+const LEADSQUARED_SECRET_KEY = cleanLeadSquaredCredential(
   process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || runtimeConfig.LSQ_SECRET_KEY
 );
 
