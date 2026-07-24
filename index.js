@@ -22,10 +22,18 @@ mongoose.set('strictQuery', true);
 mongoose.connection.on('error', err => console.error('Mongo Error:', err));
 mongoose.connection.on('disconnected', () => console.warn('MongoDB Disconnected'));
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || runtimeConfig.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);
+const parseOrigins = value =>
+  (value || '')
+    .split(',')
+    .map(origin => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+// Keep the production domains available even when Hostinger provides an
+// ALLOWED_ORIGINS environment variable containing additional origins.
+const configuredOrigins = [
+  ...parseOrigins(runtimeConfig.ALLOWED_ORIGINS),
+  ...parseOrigins(process.env.ALLOWED_ORIGINS),
+];
 
 const defaultDevOrigins = [
   'http://localhost:3000',
@@ -34,24 +42,34 @@ const defaultDevOrigins = [
   'http://127.0.0.1:3001',
 ];
 
-const effectiveAllowedOrigins = Array.from(new Set([...allowedOrigins, ...defaultDevOrigins]));
+const effectiveAllowedOrigins = new Set([...configuredOrigins, ...defaultDevOrigins]);
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow non-browser tools (Postman/curl) and same-origin server calls.
-      if (!origin) {
-        return callback(null, true);
-      }
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow non-browser tools (Postman/curl) and same-origin server calls.
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      if (effectiveAllowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    const normalizedOrigin = origin.trim().replace(/\/$/, '');
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-  })
-);
+    if (effectiveAllowedOrigins.has(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    const error = new Error(`CORS blocked for origin: ${origin}`);
+    error.status = 403;
+    return callback(error);
+  },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Accept', 'Authorization', 'Content-Type', 'Origin', 'X-Requested-With'],
+  optionsSuccessStatus: 204,
+  preflightContinue: false,
+};
+
+// This middleware answers browser OPTIONS preflight requests before database
+// connection or route handlers are invoked.
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 
 const connectToDatabase = async () => {
@@ -106,7 +124,10 @@ app.use('/api/job-applications', jobApplicationRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error', err);
-  res.status(500).json({ ok: false, error: 'Internal Server Error' });
+  res.status(err.status || 500).json({
+    ok: false,
+    error: err.status === 403 ? err.message : 'Internal Server Error',
+  });
 });
 
 const startServer = async () => {
@@ -122,7 +143,7 @@ const startServer = async () => {
   }
 };
 
-if (!process.env.VERCEL) {
+if (require.main === module) {
   startServer();
 }
 
