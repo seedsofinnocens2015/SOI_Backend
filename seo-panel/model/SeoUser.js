@@ -30,6 +30,4 @@ const seoUserSchema = new Schema(
   { timestamps: true }
 );
 
-seoUserSchema.index({ email: 1 }, { unique: true });
-
 module.exports = mongoose.models.SeoUser || mongoose.model('SeoUser', seoUserSchema, 'seo_users');
