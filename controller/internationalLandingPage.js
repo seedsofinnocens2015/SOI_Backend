@@ -20,10 +20,10 @@ const LEADSQUARED_ENDPOINT = cleanEnvValue(
   process.env.LSQ_ENDPOINT || process.env.LEADSQUARED_ENDPOINT || process.env.LEADSQUARED_URL || ''
 );
 const LEADSQUARED_ACCESS_KEY = cleanEnvValue(
-  process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || process.env.ACCESS_KEY || runtimeConfig.LSQ_ACCESS_KEY
+  process.env.LSQ_ACCESS_KEY || process.env.LEADSQUARED_ACCESS_KEY || runtimeConfig.LSQ_ACCESS_KEY
 );
 const LEADSQUARED_SECRET_KEY = cleanEnvValue(
-  process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || process.env.SECRET_KEY || runtimeConfig.LSQ_SECRET_KEY
+  process.env.LSQ_SECRET_KEY || process.env.LEADSQUARED_SECRET_KEY || runtimeConfig.LSQ_SECRET_KEY
 );
 
 const NOTIFICATION_EMAIL = cleanEnvValue(
