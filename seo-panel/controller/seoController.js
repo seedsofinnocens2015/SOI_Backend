@@ -277,8 +277,9 @@ const getSeo = async (req, res) => {
 const getSeoStats = async (req, res) => {
   try {
     const parsedPageUrls = (() => {
-      const value = req.query.pageUrls;
+      const value = req.body?.pageUrls ?? req.query.pageUrls;
       if (!value) return [];
+      if (Array.isArray(value)) return value;
       try {
         const parsed = JSON.parse(value);
         return Array.isArray(parsed) ? parsed : [];
@@ -361,4 +362,3 @@ module.exports = {
   getSeoResolved,
   getSeoStats,
 };
-
