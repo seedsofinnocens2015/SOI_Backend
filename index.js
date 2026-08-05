@@ -12,11 +12,14 @@ const seoRoutes = require('./seo-panel/routes/seoRoutes');
 const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
 const jobRoutes = require('./seo-panel/routes/jobRoutes');
 const jobApplicationRoutes = require('./seo-panel/routes/jobApplicationRoutes');
+const leadRoutes = require('./seo-panel/routes/leadRoutes');
+const { startLeadRetentionSchedule } = require('./seo-panel/services/leadRetention');
 
 const app = express();
 const PORT = process.env.PORT || runtimeConfig.PORT;
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || runtimeConfig.MONGO_URI;
 let mongoConnectionPromise = null;
+let leadRetentionStarted = false;
 
 mongoose.set('strictQuery', true);
 mongoose.connection.on('error', err => console.error('Mongo Error:', err));
@@ -89,6 +92,10 @@ const connectToDatabase = async () => {
     .connect(MONGO_URI, { family: 4 })
     .then(() => {
       console.log('MongoDB Connected Successfully');
+      if (!leadRetentionStarted) {
+        startLeadRetentionSchedule();
+        leadRetentionStarted = true;
+      }
       return mongoose.connection;
     })
     .catch((err) => {
@@ -121,6 +128,7 @@ app.use('/api/seo-auth', seoAuthRoutes);
 app.use('/api/seo', seoRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
+app.use('/api/panel-leads', leadRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error', err);

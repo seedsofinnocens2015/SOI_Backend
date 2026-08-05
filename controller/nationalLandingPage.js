@@ -1,6 +1,7 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../config/runtimeConfig');
+const Lead = require('../seo-panel/model/Lead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
@@ -251,6 +252,17 @@ const createNationalLandingPageLead = async (req, res) => {
       ...(normalized.utm_medium && { utm_medium: normalized.utm_medium }),
       ...(normalized.utm_campaign && { utm_campaign: normalized.utm_campaign }),
     };
+
+    await Lead.create({
+      leadType: 'landing-page',
+      name: normalized.fullName,
+      phone: normalized.phoneNumber,
+      center: normalized.center,
+      source: normalized.source,
+      utm_source: normalized.utm_source,
+      utm_medium: normalized.utm_medium,
+      utm_campaign: normalized.utm_campaign,
+    });
 
     let leadSquaredResponse;
     let leadSquaredError = null;
