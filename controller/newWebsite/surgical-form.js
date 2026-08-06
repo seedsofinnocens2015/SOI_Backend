@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
+const Lead = require('../../seo-panel/model/Lead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 
@@ -95,6 +96,15 @@ const createSurgicalFormSubmission = async (req, res) => {
         error: 'Please accept the Privacy Policy and T&C.',
       });
     }
+
+    await Lead.create({
+      leadType: 'surgical-center',
+      name,
+      phone,
+      center,
+      message,
+      source,
+    });
 
     const rows = [
       ['Name', name],

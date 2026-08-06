@@ -6,7 +6,7 @@ const leadSchema = new Schema(
   {
     leadType: {
       type: String,
-      enum: ['website', 'landing-page'],
+      enum: ['website', 'landing-page', 'surgical-center'],
       required: true,
       index: true,
     },

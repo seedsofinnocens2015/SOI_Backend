@@ -3,7 +3,7 @@ const Lead = require('../model/Lead');
 async function listLeads(req, res) {
   try {
     const leadType = String(req.query.type || '').trim();
-    if (!['website', 'landing-page'].includes(leadType)) {
+    if (!['website', 'landing-page', 'surgical-center'].includes(leadType)) {
       return res.status(400).json({ ok: false, error: 'A valid lead type is required.' });
     }
 
