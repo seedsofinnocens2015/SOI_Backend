@@ -18,6 +18,7 @@ const SURGICAL_NOTIFICATION_EMAIL = cleanEnvValue(
 const EMAIL_FROM =
   cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
   `"SOI Surgical Center" <${SMTP_USER || 'no-reply@example.com'}>`;
+const SURGICAL_FROM = `"SOI Surgical Center" <${SMTP_USER}>`;
 
 let transporter;
 
@@ -113,16 +114,40 @@ const createSurgicalFormSubmission = async (req, res) => {
       )
       .join('');
 
+    const submittedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const text = [
+      'New Surgical Consultation Request',
+      '',
+      `Name: ${name}`,
+      `Phone: ${phone}`,
+      `Center: ${center}`,
+      `Message: ${message || 'Not provided'}`,
+      'Consent Accepted: Yes',
+      `Source: ${source}`,
+      `Submitted At: ${submittedAt}`,
+    ].join('\n');
+
     const mailInfo = await ensureTransporter().sendMail({
-      from: EMAIL_FROM,
+      // Keep the visible sender and SMTP envelope aligned with the authenticated
+      // mailbox. This improves SPF/DMARC alignment and Gmail delivery.
+      from: SURGICAL_FROM || EMAIL_FROM,
       to: SURGICAL_NOTIFICATION_EMAIL,
+      envelope: {
+        from: SMTP_USER,
+        to: SURGICAL_NOTIFICATION_EMAIL,
+      },
+      replyTo: SMTP_USER,
       subject: `New Surgical Consultation Request - ${name}`,
+      text,
       html: `
         <div style="font-family:Arial,sans-serif;color:#222;">
           <h2 style="color:#df3655;">New Surgical Consultation Request</h2>
           <table style="width:100%;max-width:640px;border-collapse:collapse;">
             <tbody>${rows}</tbody>
           </table>
+          <p style="margin-top:18px;color:#777;font-size:12px;">
+            This notification was sent by the Seeds of Innocens Surgical Center website form.
+          </p>
         </div>
       `,
     });
@@ -138,6 +163,7 @@ const createSurgicalFormSubmission = async (req, res) => {
       recipient: SURGICAL_NOTIFICATION_EMAIL,
       messageId: mailInfo.messageId,
       response: mailInfo.response,
+      envelope: mailInfo.envelope,
     });
 
     return res.status(201).json({

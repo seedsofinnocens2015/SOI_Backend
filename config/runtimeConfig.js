@@ -6,7 +6,7 @@ const runtimeConfig = {
   RECEIVER_EMAIL: 'digital@seedsofinnocence.com',
   FEEDBACK_RECEIVER_EMAIL: 'feedback@seedsofinnocence.com',
   CAREERS_RECEIVER_EMAIL: 'career@seedsofinnocence.com',
-  SURGICAL_RECEIVER_EMAIL: 'innocensseedsof@gmail.com',
+  SURGICAL_RECEIVER_EMAIL: 'soisurgicalcentre@gmail.com',
   SEO_AUTH_JWT_SECRET: 'change-this-seo-secret',
   LSQ_BASE_URL: 'https://api-in21.leadsquared.com',
   LSQ_ACCESS_KEY: 'u$re4c970aee03a36630af47605bf4675fa',
