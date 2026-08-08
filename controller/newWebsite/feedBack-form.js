@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
+const { normalizePhone, reserveLeadPhone } = require('../../utils/preventDuplicateLead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 
@@ -110,6 +111,7 @@ const createUnifiedFormSubmission = async (req, res) => {
       agree: getFormValue(req.body, 'agree'),
       submittedAt: new Date().toISOString(),
     };
+    payload.phone = normalizePhone(payload.phone);
 
     if (
       !payload.name ||
@@ -133,6 +135,9 @@ const createUnifiedFormSubmission = async (req, res) => {
       });
     }
 
+
+    await reserveLeadPhone(payload.phone, 'feedback-form');
+
     await sendFeedbackNotificationEmail(payload);
 
     return res.status(201).json({
@@ -143,6 +148,7 @@ const createUnifiedFormSubmission = async (req, res) => {
     console.error('Feedback form submission error:', error.message);
     return res.status(error.status || 500).json({
       ok: false,
+      ...(error.duplicate && { duplicate: true }),
       error: error.message || 'Unable to process feedback submission.',
     });
   }

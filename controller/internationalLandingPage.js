@@ -1,5 +1,6 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const { reserveLeadPhone } = require('../utils/preventDuplicateLead');
 const runtimeConfig = require('../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
@@ -228,6 +229,8 @@ const createInternationalConsultation = async (req, res) => {
       source: normalized.source,
     };
 
+    await reserveLeadPhone(normalized.phone, 'international-landing-page');
+
     let leadSquaredResponse;
     let leadSquaredError = null;
     try {
@@ -277,6 +280,7 @@ const createInternationalConsultation = async (req, res) => {
 
     res.status(status).json({
       success: false,
+      ...(error.duplicate && { duplicate: true }),
       message: typeof message === 'string' ? message : JSON.stringify(message),
     });
   }

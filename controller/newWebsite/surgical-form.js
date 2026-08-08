@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
 const Lead = require('../../seo-panel/model/Lead');
+const { reserveLeadPhone } = require('../../utils/preventDuplicateLead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 
@@ -97,6 +98,8 @@ const createSurgicalFormSubmission = async (req, res) => {
       });
     }
 
+    await reserveLeadPhone(phone, 'surgical-form');
+
     await Lead.create({
       leadType: 'surgical-center',
       name,
@@ -190,7 +193,10 @@ const createSurgicalFormSubmission = async (req, res) => {
     console.error('Surgical form submission failed:', error.message);
     return res.status(error.status || 500).json({
       ok: false,
-      error: 'Unable to submit your request right now. Please try again.',
+      ...(error.duplicate && { duplicate: true }),
+      error: error.duplicate
+        ? error.message
+        : 'Unable to submit your request right now. Please try again.',
     });
   }
 };

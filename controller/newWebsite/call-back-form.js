@@ -1,6 +1,7 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
+const { reserveLeadPhone } = require('../../utils/preventDuplicateLead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
@@ -292,6 +293,8 @@ const createCallBackRequest = async (req, res) => {
       source: normalized.source,
     };
 
+    await reserveLeadPhone(normalized.phone, 'call-back-form');
+
     let leadSquaredResponse;
     let leadSquaredError = null;
     try {
@@ -367,6 +370,7 @@ const createCallBackRequest = async (req, res) => {
 
     res.status(status).json({
       ok: false,
+      ...(error.duplicate && { duplicate: true }),
       error: typeof message === 'string' ? message : JSON.stringify(message),
     });
   }

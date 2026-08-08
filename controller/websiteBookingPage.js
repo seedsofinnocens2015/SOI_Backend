@@ -1,5 +1,6 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const { reserveLeadPhone } = require('../utils/preventDuplicateLead');
 const runtimeConfig = require('../config/runtimeConfig');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
@@ -241,6 +242,8 @@ const createWebsiteBooking = async (req, res) => {
       message: normalized.message,
     };
 
+    await reserveLeadPhone(normalized.phone, 'website-booking');
+
     let leadSquaredResponse;
     let leadSquaredError = null;
     try {
@@ -290,6 +293,7 @@ const createWebsiteBooking = async (req, res) => {
 
     res.status(status).json({
       ok: false,
+      ...(error.duplicate && { duplicate: true }),
       error: typeof message === 'string' ? message : JSON.stringify(message),
     });
   }

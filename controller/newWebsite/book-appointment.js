@@ -2,6 +2,7 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../../config/runtimeConfig');
 const Lead = require('../../seo-panel/model/Lead');
+const { reserveLeadPhone } = require('../../utils/preventDuplicateLead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
@@ -345,6 +346,8 @@ const createBookAppointment = async (req, res) => {
       ...(normalized.utm_campaign && { utm_campaign: normalized.utm_campaign }),
     };
 
+    await reserveLeadPhone(normalized.phone, 'book-appointment');
+
     await Lead.create({
       leadType: 'website',
       name: emailPayload.name,
@@ -432,6 +435,7 @@ const createBookAppointment = async (req, res) => {
 
     res.status(status).json({
       ok: false,
+      ...(error.duplicate && { duplicate: true }),
       error: typeof message === 'string' ? message : JSON.stringify(message),
     });
   }

@@ -2,6 +2,7 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../config/runtimeConfig');
 const Lead = require('../seo-panel/model/Lead');
+const { reserveLeadPhone } = require('../utils/preventDuplicateLead');
 
 const cleanEnvValue = (value) => (value || '').split('#')[0].trim();
 const cleanLeadSquaredCredential = (value) => cleanEnvValue(value).replace(/\\\$/g, '$');
@@ -253,6 +254,8 @@ const createNationalLandingPageLead = async (req, res) => {
       ...(normalized.utm_campaign && { utm_campaign: normalized.utm_campaign }),
     };
 
+    await reserveLeadPhone(normalized.phoneNumber, 'national-landing-page');
+
     await Lead.create({
       leadType: 'landing-page',
       name: normalized.fullName,
@@ -310,6 +313,7 @@ const createNationalLandingPageLead = async (req, res) => {
 
     res.status(status).json({
       ok: false,
+      ...(error.duplicate && { duplicate: true }),
       message: typeof message === 'string' ? message : JSON.stringify(message),
     });
   }
