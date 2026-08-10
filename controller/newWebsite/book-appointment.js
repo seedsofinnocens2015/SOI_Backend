@@ -28,6 +28,7 @@ const LEADSQUARED_SECRET_KEY = cleanLeadSquaredCredential(
 const NOTIFICATION_EMAIL = cleanEnvValue(
   process.env.RECEIVER_EMAIL || process.env.NOTIFICATION_EMAIL || runtimeConfig.RECEIVER_EMAIL
 );
+const INTERNATIONAL_BANNER_NOTIFICATION_EMAIL = 'amit.kumar@seedsofinnocence.com';
 const EMAIL_FROM =
   cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
   `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
@@ -240,7 +241,7 @@ const sendNotificationEmail = async (formData, options = {}) => {
     error.status = 500;
     throw error;
   }
-  const { leadSquaredStatus } = options;
+  const { leadSquaredStatus, includeInternationalBannerRecipient = false } = options;
 
   const emailData = {
     name: formData.name || `${formData.firstName} ${formData.lastName || ''}`.trim(),
@@ -280,6 +281,9 @@ const sendNotificationEmail = async (formData, options = {}) => {
   await mailer.sendMail({
     from: EMAIL_FROM,
     to: NOTIFICATION_EMAIL,
+    ...(includeInternationalBannerRecipient && {
+      cc: INTERNATIONAL_BANNER_NOTIFICATION_EMAIL,
+    }),
     subject: `New Appointment Booking - ${subjectName}`,
     html,
   });
@@ -326,6 +330,7 @@ const isDuplicateLeadSquaredError = (error) => {
 const createBookAppointment = async (req, res) => {
   try {
     const submittedAt = new Date();
+    const isInternationalBannerLead = req.body?.source === 'International Centre Banner';
 
     const { leadSquaredPayload, normalized } = buildLeadSquaredPayload({
       ...req.body,
@@ -391,7 +396,10 @@ const createBookAppointment = async (req, res) => {
     const leadSquaredStatusNote = leadSquaredError ? `FAILED – ${describeLeadSquaredError(leadSquaredError)}` : 'Success';
     let emailError = null;
     try {
-      await sendNotificationEmail(emailPayload, { leadSquaredStatus: leadSquaredStatusNote });
+      await sendNotificationEmail(emailPayload, {
+        leadSquaredStatus: leadSquaredStatusNote,
+        includeInternationalBannerRecipient: isInternationalBannerLead,
+      });
     } catch (err) {
       emailError = err;
       console.error('❌ Notification email sending failed');
