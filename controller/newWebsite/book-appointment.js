@@ -28,7 +28,7 @@ const LEADSQUARED_SECRET_KEY = cleanLeadSquaredCredential(
 const NOTIFICATION_EMAIL = cleanEnvValue(
   process.env.RECEIVER_EMAIL || process.env.NOTIFICATION_EMAIL || runtimeConfig.RECEIVER_EMAIL
 );
-const INTERNATIONAL_BANNER_NOTIFICATION_EMAIL = 'amit.kumar@seedsofinnocence.com';
+const INTERNATIONAL_BANNER_NOTIFICATION_EMAIL = 'soi.international@seedsofinnocence.com';
 const EMAIL_FROM =
   cleanEnvValue(process.env.EMAIL_FROM || runtimeConfig.EMAIL_FROM || SMTP_FROM) ||
   `"SOI Website" <${SMTP_USER || 'no-reply@example.com'}>`;
