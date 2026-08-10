@@ -75,6 +75,7 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
     fullName = '',
     phoneNumber = '',
     center = '',
+    message = '',
     source = '',
     utm_source = '',
     utm_medium = '',
@@ -108,17 +109,22 @@ const buildNationalLeadSquaredPayload = (formData = {}) => {
   }
 
   const safeCenter = String(center).trim();
+  const safeMessage = String(message || '').trim();
   const safeSource = String(source || '').trim();
   const safeUtmSource = String(utm_source || '').trim();
   const safeUtmMedium = String(utm_medium || '').trim();
   const safeUtmCampaign = String(utm_campaign || '').trim();
 
-  const notes = `Preferred center: ${safeCenter}`;
+  const notes = [
+    `Preferred center: ${safeCenter}`,
+    safeMessage ? `Message: ${safeMessage}` : '',
+  ].filter(Boolean).join(' | ');
 
   const normalized = {
     fullName: safeFullName,
     phoneNumber: safePhone,
     center: safeCenter,
+    message: safeMessage,
     source: safeSource,
     utm_source: safeUtmSource,
     utm_medium: safeUtmMedium,
@@ -248,6 +254,7 @@ const createNationalLandingPageLead = async (req, res) => {
       fullName: normalized.fullName,
       phoneNumber: normalized.phoneNumber,
       center: normalized.center,
+      ...(normalized.message && { message: normalized.message }),
       ...(normalized.source && { source: normalized.source }),
       ...(normalized.utm_source && { utm_source: normalized.utm_source }),
       ...(normalized.utm_medium && { utm_medium: normalized.utm_medium }),
@@ -261,6 +268,7 @@ const createNationalLandingPageLead = async (req, res) => {
       name: normalized.fullName,
       phone: normalized.phoneNumber,
       center: normalized.center,
+      message: normalized.message,
       source: normalized.source,
       utm_source: normalized.utm_source,
       utm_medium: normalized.utm_medium,
