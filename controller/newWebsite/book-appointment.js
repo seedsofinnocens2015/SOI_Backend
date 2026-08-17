@@ -57,14 +57,23 @@ const ensureTransporter = () => {
   return transporter;
 };
 
-const sanitizePhone = (phone) => {
+const sanitizePhone = (phone, { allowInternational = false } = {}) => {
   if (!phone) return '';
-  return String(phone).replace(/\D/g, '').slice(-10);
+  const digits = String(phone).replace(/\D/g, '');
+  return allowInternational ? digits : digits.slice(-10);
 };
 
 const validateIndianPhone = (phone) => {
   if (!/^[6-9]\d{9}$/.test(phone)) {
     const error = new Error('Invalid number');
+    error.status = 400;
+    throw error;
+  }
+};
+
+const validateInternationalPhone = (phone) => {
+  if (!/^[1-9]\d{6,14}$/.test(phone)) {
+    const error = new Error('Enter a valid international phone number with country code.');
     error.status = 400;
     throw error;
   }
@@ -130,20 +139,31 @@ const buildLeadSquaredPayload = (formData) => {
     utm_source = '',
     utm_medium = '',
     utm_campaign = '',
+    isInternationalLead = false,
+    requiresEmail = false,
   } = formData;
 
   const leadSource = 'New Website Form';
 
   validateCaptcha(formData);
 
-  const safePhone = sanitizePhone(phone);
+  const safePhone = sanitizePhone(phone, { allowInternational: isInternationalLead });
   const selectedCenter = normalizeCenterName(center);
   if (!name || !safePhone || !selectedCenter) {
     const error = new Error('Missing required fields: name, phone and center');
     error.status = 400;
     throw error;
   }
-  validateIndianPhone(safePhone);
+  if (requiresEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    const error = new Error('Please enter a valid email address.');
+    error.status = 400;
+    throw error;
+  }
+  if (isInternationalLead) {
+    validateInternationalPhone(safePhone);
+  } else {
+    validateIndianPhone(safePhone);
+  }
 
   const { firstName, lastName } = splitName(name);
   const safeUtmSource = String(utm_source || '').trim();
@@ -330,10 +350,16 @@ const isDuplicateLeadSquaredError = (error) => {
 const createBookAppointment = async (req, res) => {
   try {
     const submittedAt = new Date();
-    const isInternationalBannerLead = req.body?.source === 'International Centre Banner';
+    const isInternationalLead = [
+      'International Centre Banner',
+      'International Contact Team',
+    ].includes(req.body?.source);
+    const requiresEmail = req.body?.source === 'International Contact Team';
 
     const { leadSquaredPayload, normalized } = buildLeadSquaredPayload({
       ...req.body,
+      isInternationalLead,
+      requiresEmail,
       source: 'Website Form',
     });
 
@@ -398,7 +424,7 @@ const createBookAppointment = async (req, res) => {
     try {
       await sendNotificationEmail(emailPayload, {
         leadSquaredStatus: leadSquaredStatusNote,
-        includeInternationalBannerRecipient: isInternationalBannerLead,
+        includeInternationalBannerRecipient: isInternationalLead,
       });
     } catch (err) {
       emailError = err;
