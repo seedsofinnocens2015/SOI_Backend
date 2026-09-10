@@ -109,6 +109,9 @@ const createUnifiedFormSubmission = async (req, res) => {
       rating: getFormValue(req.body, 'rating'),
       feedback: getFormValue(req.body, 'feedback'),
       agree: getFormValue(req.body, 'agree'),
+      utm_source: getFormValue(req.body, 'utm_source') || '',
+      utm_medium: getFormValue(req.body, 'utm_medium') || '',
+      utm_campaign: getFormValue(req.body, 'utm_campaign') || '',
       submittedAt: new Date().toISOString(),
     };
     payload.phone = normalizePhone(payload.phone);

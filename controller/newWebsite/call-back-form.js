@@ -85,6 +85,9 @@ const buildLeadSquaredPayload = (formData) => {
     date = '',
     reason = '',
     message = '',
+    utm_source = '',
+    utm_medium = '',
+    utm_campaign = '',
   } = formData;
 
   const leadSource = 'New Website Form';
@@ -99,6 +102,9 @@ const buildLeadSquaredPayload = (formData) => {
   validateIndianPhone(safePhone);
 
   const { firstName, lastName } = splitName(safeName);
+  const safeUtmSource = String(utm_source || '').trim();
+  const safeUtmMedium = String(utm_medium || '').trim();
+  const safeUtmCampaign = String(utm_campaign || '').trim();
 
   // Build call back details for notes
   const callBackDetails = [
@@ -129,6 +135,9 @@ const buildLeadSquaredPayload = (formData) => {
     reason,
     message: fullMessage,
     source: leadSource,
+    utm_source: safeUtmSource,
+    utm_medium: safeUtmMedium,
+    utm_campaign: safeUtmCampaign,
   };
 
   const payload = [
@@ -140,6 +149,9 @@ const buildLeadSquaredPayload = (formData) => {
     { Attribute: 'mx_Appointment_Time', Value: callTime },
     { Attribute: 'Source', Value: leadSource },
     { Attribute: 'Notes', Value: notesMessage },
+    { Attribute: 'mx_utm_source', Value: safeUtmSource },
+    { Attribute: 'mx_utm_medium', Value: safeUtmMedium },
+    { Attribute: 'mx_utm_campaign', Value: safeUtmCampaign },
   ].filter(entry => entry.Value !== undefined && entry.Value !== null && `${entry.Value}`.trim() !== '');
 
   return {
@@ -202,6 +214,9 @@ const sendNotificationEmail = async (formData, options = {}) => {
     date: formData.date,
     reason: formData.reason,
     message: formData.message,
+    utm_source: formData.utm_source,
+    utm_medium: formData.utm_medium,
+    utm_campaign: formData.utm_campaign,
   };
 
   if (leadSquaredStatus) {
@@ -291,6 +306,9 @@ const createCallBackRequest = async (req, res) => {
       reason: normalized.reason,
       message: normalized.message,
       source: normalized.source,
+      ...(normalized.utm_source && { utm_source: normalized.utm_source }),
+      ...(normalized.utm_medium && { utm_medium: normalized.utm_medium }),
+      ...(normalized.utm_campaign && { utm_campaign: normalized.utm_campaign }),
     };
 
     await reserveLeadPhone(normalized.phone, 'call-back-form');
