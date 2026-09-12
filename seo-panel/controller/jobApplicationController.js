@@ -86,6 +86,9 @@ function normalizeGeneralApplicantFields(body = {}) {
     requirements: clean(body.requirements),
     skills: clean(body.skills),
     additionalInfo: clean(body.additionalInfo ?? body.coverLetter),
+    noticePeriod: clean(body.noticePeriod),
+    currentCtc: clean(body.currentCtc),
+    expectedCtc: clean(body.expectedCtc),
   };
 }
 
@@ -99,6 +102,9 @@ function validateGeneralApplicantFields(fields) {
     'department',
     'preferredPosition',
     'requirements',
+    'noticePeriod',
+    'currentCtc',
+    'expectedCtc',
   ];
   if (requiredFields.some(field => !fields[field])) {
     return 'Please complete all required general application fields.';
