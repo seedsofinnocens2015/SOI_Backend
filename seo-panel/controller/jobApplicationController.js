@@ -4,7 +4,7 @@ const { JobOpening } = require('../model/JobOpening');
 const { deleteResume, getSignedResumeUrl, uploadResume } = require('../services/resumeStorage');
 const { sendApplicationNotificationEmail } = require('../services/applicationEmailService');
 
-const APPLICATION_STATUSES = ['new', 'reviewing', 'shortlisted', 'rejected', 'hired'];
+const APPLICATION_STATUSES = ['new', 'reviewing', 'shortlisted', 'hold', 'rejected', 'hired'];
 const GENERAL_APPLICATION_JOB_FIELDS = [
   'Accounts & Finance',
   'Admin & Operations',

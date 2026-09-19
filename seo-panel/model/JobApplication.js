@@ -28,7 +28,7 @@ const jobApplicationSchema = new Schema(
     additionalInfo: { type: String, trim: true, maxlength: 5000 },
     status: {
       type: String,
-      enum: ['new', 'reviewing', 'shortlisted', 'rejected', 'hired'],
+      enum: ['new', 'reviewing', 'shortlisted', 'hold', 'rejected', 'hired'],
       default: 'new',
       index: true,
     },
