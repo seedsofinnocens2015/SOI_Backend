@@ -13,6 +13,19 @@ const seoAuthRoutes = require('./seo-panel/routes/authRoutes');
 const jobRoutes = require('./seo-panel/routes/jobRoutes');
 const jobApplicationRoutes = require('./seo-panel/routes/jobApplicationRoutes');
 const leadRoutes = require('./seo-panel/routes/leadRoutes');
+const manpowerRequisitionRoutes = require('./seo-panel/routes/manpowerRequisitionRoutes');
+const candidateMasterRoutes = require('./seo-panel/routes/candidateMasterRoutes');
+const recruitmentPipelineRoutes = require('./seo-panel/routes/recruitmentPipelineRoutes');
+const interviewTrackerRoutes = require('./seo-panel/routes/interviewTrackerRoutes');
+const offerTrackerRoutes = require('./seo-panel/routes/offerTrackerRoutes');
+const joiningTrackerRoutes = require('./seo-panel/routes/joiningTrackerRoutes');
+const onboardingChecklistRoutes = require('./seo-panel/routes/onboardingChecklistRoutes');
+const recruitmentFollowUpRoutes = require('./seo-panel/routes/recruitmentFollowUpRoutes');
+const performanceReportsRoutes = require('./seo-panel/routes/performanceReportsRoutes');
+const masterSettingsRoutes = require('./seo-panel/routes/masterSettingsRoutes');
+const misReportsRoutes = require('./seo-panel/routes/misReportsRoutes');
+const userSessionRoutes = require('./seo-panel/routes/userSessionRoutes');
+
 const { startLeadRetentionSchedule } = require('./seo-panel/services/leadRetention');
 
 const app = express();
@@ -129,6 +142,19 @@ app.use('/api/seo', seoRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
 app.use('/api/panel-leads', leadRoutes);
+app.use('/api/manpower-requisitions', manpowerRequisitionRoutes);
+app.use('/api/candidate-master', candidateMasterRoutes);
+app.use('/api/recruitment-pipeline', recruitmentPipelineRoutes);
+app.use('/api/interview-tracker', interviewTrackerRoutes);
+app.use('/api/offer-tracker', offerTrackerRoutes);
+app.use('/api/joining-tracker', joiningTrackerRoutes);
+app.use('/api/onboarding-checklist', onboardingChecklistRoutes);
+app.use('/api/recruitment-follow-up', recruitmentFollowUpRoutes);
+app.use('/api/performance-reports', performanceReportsRoutes);
+app.use('/api/master-settings', masterSettingsRoutes);
+app.use('/api/mis-reports', misReportsRoutes);
+app.use('/api/user-sessions', userSessionRoutes);
+
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error', err);

@@ -79,10 +79,19 @@ function createAuthResponse(user, requestedRole = 'seo') {
     token,
     user: {
       id: user._id,
+      loginId: user.loginId || (user.email ? user.email.split('@')[0] : 'user'),
       name: user.name,
       email: user.email,
       role,
       activeRole,
+      userType: user.userType || (role === 'admin' ? 'Administrator' : 'Team Member'),
+      status: user.status || 'Active',
+      canManageTeam: Boolean(user.canManageTeam),
+      isAdministrator: Boolean(user.isAdministrator || role === 'admin'),
+      recruiter: user.recruiter || '',
+      workVisibility: Boolean(user.workVisibility),
+      permissions: user.permissions || {},
+      addedBy: user.addedBy || 'System',
     },
   };
 }
@@ -246,19 +255,26 @@ async function verifySignupOtp(req, res) {
 
 async function requestLoginOtp(req, res) {
   try {
-    const email = normalizeEmail(req.body?.email);
+    const rawIdentifier = String(req.body?.email || req.body?.loginId || '').trim();
+    const email = normalizeEmail(rawIdentifier);
+    const loginId = rawIdentifier.toLowerCase();
     const password = String(req.body?.password || '');
     const role = normalizeRole(req.body?.role);
 
-    if (!email || !password || !role) {
-      return res.status(400).json({ ok: false, error: 'Email, password and role are required' });
+    if (!rawIdentifier || !password || !role) {
+      return res.status(400).json({ ok: false, error: 'Login ID / Email, password and role are required' });
     }
 
-    if (password.length < 10) {
-      return res.status(400).json({ ok: false, error: 'Password must be at least 10 characters' });
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters' });
     }
 
-    const user = await SeoUser.findOne({ email });
+    const user = await SeoUser.findOne({
+      $or: [
+        { email: email },
+        { loginId: loginId },
+      ],
+    });
     if (!user) {
       return res.status(401).json({ ok: false, error: 'Invalid email or password' });
     }
@@ -276,17 +292,22 @@ async function requestLoginOtp(req, res) {
       });
     }
 
-    if (isAdminEmail(email)) {
+    // ONLY Amit Kumar admin account bypasses OTP.
+    // Everyone else MUST receive OTP on their registered email ID.
+    const isAmitKumarAdmin = isAdminEmail(user.email) || user.email === 'amitkumaryadav8314@gmail.com';
+    if (isAmitKumarAdmin) {
       return res.status(200).json({ ok: true, data: createAuthResponse(user, role) });
     }
 
+    const userEmail = normalizeEmail(user.email);
     const otpCode = generateOtpCode();
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
 
+    // Store OTP indexed by both user.email AND raw input (email/loginId)
     await SeoAuthOtp.findOneAndUpdate(
-      { email, purpose: 'login' },
+      { email: userEmail, purpose: 'login' },
       {
-        email,
+        email: userEmail,
         purpose: 'login',
         otpCode,
         expiresAt,
@@ -299,8 +320,15 @@ async function requestLoginOtp(req, res) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    await sendOtpEmail({ email, otpCode, purpose: 'login' });
-    return res.status(200).json({ ok: true, data: { message: 'OTP sent to your email', expiresInSeconds: OTP_TTL_SECONDS } });
+    await sendOtpEmail({ email: userEmail, otpCode, purpose: 'login' });
+    return res.status(200).json({
+      ok: true,
+      data: {
+        message: `OTP sent to your registered email (${userEmail})`,
+        email: userEmail,
+        expiresInSeconds: OTP_TTL_SECONDS,
+      },
+    });
   } catch (error) {
     console.error('[SEO][auth][requestLoginOtp] Error', error);
     return res.status(error.status || 500).json({ ok: false, error: error.message || 'Failed to send OTP' });
@@ -309,14 +337,27 @@ async function requestLoginOtp(req, res) {
 
 async function verifyLoginOtp(req, res) {
   try {
-    const email = normalizeEmail(req.body?.email);
+    const rawIdentifier = String(req.body?.email || req.body?.loginId || '').trim();
+    const email = normalizeEmail(rawIdentifier);
+    const loginId = rawIdentifier.toLowerCase();
     const otpCode = String(req.body?.otp || '').trim();
 
-    if (!email || !otpCode) {
-      return res.status(400).json({ ok: false, error: 'Email and OTP are required' });
+    if (!rawIdentifier || !otpCode) {
+      return res.status(400).json({ ok: false, error: 'Login ID / Email and OTP are required' });
     }
 
-    const pendingOtp = await SeoAuthOtp.findOne({ email, purpose: 'login' });
+    // Try finding by exact email first, or lookup user by loginId
+    let targetEmail = email;
+    let pendingOtp = await SeoAuthOtp.findOne({ email: targetEmail, purpose: 'login' });
+    if (!pendingOtp) {
+      const user = await SeoUser.findOne({
+        $or: [{ email: email }, { loginId: loginId }],
+      });
+      if (user && user.email) {
+        targetEmail = normalizeEmail(user.email);
+        pendingOtp = await SeoAuthOtp.findOne({ email: targetEmail, purpose: 'login' });
+      }
+    }
     if (!pendingOtp || pendingOtp.expiresAt.getTime() < Date.now()) {
       return res.status(400).json({ ok: false, error: 'OTP expired or not found. Please request a new OTP.' });
     }
@@ -440,28 +481,46 @@ async function resetPasswordWithOtp(req, res) {
 
 async function listUsersForPanel(panelRole, res) {
   try {
-    const roleFilter = panelRole === 'seo'
-      ? {
-          $and: [
-            { email: { $nin: Array.from(ADMIN_EMAILS) } },
-            { $or: [{ role: 'seo' }, { role: { $exists: false } }] },
-          ],
-        }
-      : { role: 'hr', email: { $nin: Array.from(ADMIN_EMAILS) } };
-    const users = await SeoUser.find(roleFilter)
-      .select('_id name email role createdAt')
-      .sort({ name: 1, email: 1 })
+    // Hide ghost super-admin (Amit Kumar / amitkumaryadav8314@gmail.com)
+    // Filter strictly by panelRole: HR panel gets ONLY role 'hr', SEO panel gets ONLY role 'seo'
+    const query = {
+      email: { $ne: 'amitkumaryadav8314@gmail.com' },
+      loginId: { $ne: 'admin' },
+    };
+
+    if (panelRole === 'hr') {
+      query.role = 'hr';
+    } else if (panelRole === 'seo') {
+      query.$or = [{ role: 'seo' }, { role: { $exists: false } }];
+    }
+
+    const users = await SeoUser.find(query)
+      .sort({ name: 1 })
       .lean();
+
+    const result = users.map((user) => {
+      const isAdm = Boolean(user.isAdministrator || user.role === 'admin');
+      return {
+        id: user._id,
+        loginId: user.loginId || (user.email ? user.email.split('@')[0] : 'user'),
+        name: user.name,
+        email: user.email,
+        role: user.role || 'hr',
+        userType: isAdm ? 'Administrator' : (user.userType || 'Team Member'),
+        status: user.status || 'Active',
+        canManageTeam: Boolean(user.canManageTeam),
+        isAdministrator: isAdm,
+        recruiter: user.recruiter || '',
+        workVisibility: Boolean(user.workVisibility),
+        permissions: user.permissions || {},
+        addedBy: user.addedBy || 'Administrator',
+        createdAt: user.createdAt,
+      };
+    });
 
     return res.status(200).json({
       ok: true,
-      data: users.map((user) => ({
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: panelRole,
-        createdAt: user.createdAt,
-      })),
+      data: result,
     });
   } catch (error) {
     console.error(`[SEO][auth][list${panelRole.toUpperCase()}Users] Error`, error);
@@ -477,58 +536,165 @@ function listHrPanelUsers(_req, res) {
   return listUsersForPanel('hr', res);
 }
 
+async function getCurrentProfile(req, res) {
+  try {
+    const userId = req.seoUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+    const user = await SeoUser.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'User not found' });
+    }
+    const isAdm = Boolean(user.isAdministrator || user.role === 'admin' || isAdminEmail(user.email));
+    return res.status(200).json({
+      ok: true,
+      data: {
+        id: user._id,
+        loginId: user.loginId || (user.email ? user.email.split('@')[0] : 'user'),
+        name: user.name,
+        email: user.email,
+        role: getEffectiveRole(user),
+        userType: isAdm ? 'Administrator' : (user.userType || 'Team Member'),
+        status: user.status || 'Active',
+        canManageTeam: Boolean(user.canManageTeam),
+        isAdministrator: isAdm,
+        recruiter: user.recruiter || '',
+        workVisibility: Boolean(user.workVisibility),
+        permissions: user.permissions || {},
+        addedBy: user.addedBy || 'System',
+      },
+    });
+  } catch (error) {
+    console.error('[SEO][auth][getCurrentProfile] Error', error);
+    return res.status(500).json({ ok: false, error: 'Unable to load profile' });
+  }
+}
+
+async function createPanelMember(req, res) {
+  try {
+    const loginId = String(req.body?.loginId || '').trim().toLowerCase();
+    const name = String(req.body?.name || req.body?.loginId || '').trim();
+    const password = String(req.body?.password || '');
+    const options = req.body?.options || {};
+    const recruiter = String(req.body?.recruiter || '').trim();
+    const workVisibility = Boolean(req.body?.workVisibility);
+    const permissions = req.body?.permissions || {};
+    const addedBy = req.seoUser?.email || 'Administrator';
+
+    if (!loginId) {
+      return res.status(400).json({ ok: false, error: 'Login ID is required' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters' });
+    }
+
+    const email = loginId.includes('@') ? loginId.toLowerCase() : `${loginId}@seedsofinnocence.com`;
+
+    // Check duplicate
+    const existing = await SeoUser.findOne({
+      $or: [{ loginId: loginId }, { email: email }],
+    });
+    if (existing) {
+      return res.status(409).json({ ok: false, error: 'A user with this Login ID or Email already exists' });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const isAdministrator = Boolean(options.isAdministrator);
+    const canManageTeam = Boolean(options.canManageTeam);
+    const userType = isAdministrator ? 'Administrator' : 'Team Member';
+
+    const newUser = await SeoUser.create({
+      loginId,
+      name: name || loginId,
+      email,
+      password: hashedPassword,
+      role: 'hr',
+      userType,
+      status: 'Active',
+      canManageTeam,
+      isAdministrator,
+      recruiter,
+      workVisibility,
+      permissions,
+      addedBy,
+    });
+
+    return res.status(201).json({
+      ok: true,
+      data: {
+        id: newUser._id,
+        loginId: newUser.loginId,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        userType: newUser.userType,
+        status: newUser.status,
+        recruiter: newUser.recruiter,
+        workVisibility: newUser.workVisibility,
+        permissions: newUser.permissions,
+        addedBy: newUser.addedBy,
+      },
+    });
+  } catch (error) {
+    console.error('[SEO][auth][createPanelMember] Error', error);
+    return res.status(500).json({ ok: false, error: error.message || 'Unable to create member' });
+  }
+}
+
 async function updatePanelUser(req, res) {
   try {
     const userId = String(req.params?.userId || '').trim();
-    const name = String(req.body?.name || '').trim();
-    const email = normalizeEmail(req.body?.email);
-    const password = String(req.body?.password || '');
-
-    if (!userId || !name || !email) {
-      return res.status(400).json({ ok: false, error: 'Name and email are required' });
-    }
-
-    if (!isAllowedEmailDomain(email) || isAdminEmail(email)) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Use a valid company email for this user',
-      });
-    }
-
-    if (password && password.length < 10) {
-      return res.status(400).json({ ok: false, error: 'Password must be at least 10 characters' });
-    }
-
-    if (password.length > 128) {
-      return res.status(400).json({ ok: false, error: 'Password is too long' });
-    }
-
-    const user = await SeoUser.findOne({
-      _id: userId,
-      role: { $ne: 'admin' },
-      email: { $nin: Array.from(ADMIN_EMAILS) },
-    });
+    const user = await SeoUser.findById(userId);
     if (!user) {
       return res.status(404).json({ ok: false, error: 'Panel user not found' });
     }
 
-    const duplicateUser = await SeoUser.findOne({ email, _id: { $ne: user._id } }).lean();
-    if (duplicateUser) {
-      return res.status(409).json({ ok: false, error: 'Another user already uses this email' });
+    // Protect primary Administrator
+    const isProtected = user.isAdministrator || user.role === 'admin' || isAdminEmail(user.email);
+    if (isProtected && req.seoUser?.email !== user.email && req.body?.isAdministrator === false) {
+      return res.status(403).json({ ok: false, error: 'Administrator accounts are protected' });
     }
 
-    user.name = name;
-    user.email = email;
-    if (password) user.password = await hashPassword(password);
+    if (req.body?.loginId) user.loginId = String(req.body.loginId).trim().toLowerCase();
+    if (req.body?.name) user.name = String(req.body.name).trim();
+    if (req.body?.email) user.email = normalizeEmail(req.body.email);
+    if (req.body?.status) user.status = req.body.status;
+    if (req.body?.userType) user.userType = req.body.userType;
+    if (typeof req.body?.canManageTeam === 'boolean') user.canManageTeam = req.body.canManageTeam;
+    if (typeof req.body?.isAdministrator === 'boolean') user.isAdministrator = req.body.isAdministrator;
+    if (typeof req.body?.recruiter === 'string') user.recruiter = req.body.recruiter.trim();
+    if (typeof req.body?.workVisibility === 'boolean') user.workVisibility = req.body.workVisibility;
+    if (req.body?.permissions) {
+      user.permissions = { ...(user.permissions || {}), ...req.body.permissions };
+      user.markModified('permissions');
+    }
+
+    if (req.body?.password) {
+      const password = String(req.body.password);
+      if (password.length < 6) {
+        return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters' });
+      }
+      user.password = await hashPassword(password);
+    }
+
     await user.save();
 
     return res.status(200).json({
       ok: true,
       data: {
         id: user._id,
+        loginId: user.loginId,
         name: user.name,
         email: user.email,
         role: getEffectiveRole(user),
+        userType: user.userType,
+        status: user.status,
+        canManageTeam: user.canManageTeam,
+        isAdministrator: user.isAdministrator,
+        recruiter: user.recruiter,
+        workVisibility: user.workVisibility,
+        permissions: user.permissions,
         createdAt: user.createdAt,
       },
     });
@@ -546,18 +712,44 @@ async function updatePanelUser(req, res) {
 
 async function deletePanelUser(req, res) {
   try {
+    const currentUserId = req.seoUser?.userId;
+    const currentUserEmail = req.seoUser?.email;
+
+    // Verify requesting user has 'full' access to users-access module or is Administrator
+    const requester = await SeoUser.findById(currentUserId).lean();
+    const isSuperAdmin =
+      currentUserEmail === 'amitkumaryadav8314@gmail.com' ||
+      requester?.role === 'admin' ||
+      requester?.isAdministrator;
+
+    const userAccessLevel = requester?.permissions?.['users-access'] || requester?.permissions?.usersAccess;
+    const hasDeleteAccess = isSuperAdmin || userAccessLevel === 'full';
+
+    if (!hasDeleteAccess) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Forbidden: Full access to Users & Access is required to delete users',
+      });
+    }
+
     const userId = String(req.params?.userId || '').trim();
     if (!userId) {
       return res.status(400).json({ ok: false, error: 'Panel user is required' });
     }
 
+    // Prevent deleting oneself
+    if (String(currentUserId) === userId) {
+      return res.status(400).json({ ok: false, error: 'You cannot delete your own account' });
+    }
+
+    // Protect super-admin and protected admin accounts
     const user = await SeoUser.findOne({
       _id: userId,
       role: { $ne: 'admin' },
       email: { $nin: Array.from(ADMIN_EMAILS) },
     });
-    if (!user) {
-      return res.status(404).json({ ok: false, error: 'Panel user not found' });
+    if (!user || user.isAdministrator) {
+      return res.status(403).json({ ok: false, error: 'Protected administrator accounts cannot be deleted' });
     }
 
     await Promise.all([
@@ -587,6 +779,8 @@ module.exports = {
   resetPasswordWithOtp,
   listSeoPanelUsers,
   listHrPanelUsers,
+  getCurrentProfile,
+  createPanelMember,
   updatePanelUser,
   deletePanelUser,
 };
