@@ -7,6 +7,7 @@ const {
   createCandidate,
   updateCandidate,
   deleteCandidate,
+  parseCandidateCv,
 } = require('../controller/candidateMasterController');
 const { protectHrAuth } = require('../middleware/authMiddleware');
 
@@ -45,6 +46,7 @@ router.use(protectHrAuth);
 
 router.get('/', listCandidates);
 router.get('/next-id', getNextCandidateId);
+router.post('/parse-cv', uploadResumeOptional, parseCandidateCv);
 router.post('/', uploadResumeOptional, createCandidate);
 router.put('/:id', uploadResumeOptional, updateCandidate);
 router.delete('/:id', deleteCandidate);

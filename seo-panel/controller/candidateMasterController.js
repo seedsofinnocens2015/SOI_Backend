@@ -2,6 +2,7 @@ const { CandidateMaster } = require('../model/CandidateMaster');
 const { ManpowerRequisition } = require('../model/ManpowerRequisition');
 const { RecruitmentPipeline } = require('../model/RecruitmentPipeline');
 const { uploadResumeBuffer } = require('../services/resumeStorage');
+const { parseResumeBuffer } = require('../services/resumeParserService');
 
 async function listCandidates(req, res) {
   try {
@@ -245,10 +246,30 @@ async function deleteCandidate(req, res) {
   }
 }
 
+async function parseCandidateCv(req, res) {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ ok: false, error: 'Please upload a resume file to parse.' });
+    }
+
+    const result = await parseResumeBuffer(req.file.buffer, req.file.originalname || 'resume');
+    return res.status(200).json({
+      ok: true,
+      data: result.data || {},
+      method: result.method,
+      textLength: result.textLength,
+    });
+  } catch (error) {
+    console.error('Error parsing candidate CV:', error);
+    return res.status(500).json({ ok: false, error: error.message || 'Failed to parse resume.' });
+  }
+}
+
 module.exports = {
   listCandidates,
   getNextCandidateId,
   createCandidate,
   updateCandidate,
   deleteCandidate,
+  parseCandidateCv,
 };
